@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/Egorik.Core/Egorik.Core.csproj" />
+  <Project Path="src/Egorik.Infrastructure/Egorik.Infrastructure.csproj" />
+  <Project Path="src/Egorik.App/Egorik.App.csproj" />
+  <Project Path="tests/Egorik.Core.Tests/Egorik.Core.Tests.csproj" />
+</Solution>

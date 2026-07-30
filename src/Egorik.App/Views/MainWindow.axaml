@@ -1,0 +1,401 @@
+<Window
+    x:Class="Egorik.App.Views.MainWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Width="1060"
+    Height="720"
+    MinWidth="880"
+    MinHeight="620"
+    WindowStartupLocation="CenterScreen"
+    Title="Egorik">
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Grid Margin="26,20,26,14" ColumnDefinitions="*,Auto">
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <Border
+            Width="38"
+            Height="38"
+            Background="#2B2354"
+            CornerRadius="12">
+          <TextBlock
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              FontSize="20"
+              Text="✦" />
+        </Border>
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{Binding Greeting}" />
+          <TextBlock Classes="muted" FontSize="12" Text="Локальный помощник для компьютера" />
+        </StackPanel>
+      </StackPanel>
+
+      <Border
+          Grid.Column="1"
+          Padding="12,7"
+          Background="#17251F"
+          CornerRadius="18">
+        <StackPanel Orientation="Horizontal" Spacing="7">
+          <Ellipse
+              Width="8"
+              Height="8"
+              VerticalAlignment="Center"
+              Fill="#56D98B" />
+          <TextBlock VerticalAlignment="Center" FontSize="12" Text="Готов" />
+        </StackPanel>
+      </Border>
+    </Grid>
+
+    <TabControl
+        Grid.Row="1"
+        Margin="22,0"
+        SelectedIndex="{Binding SelectedTabIndex}">
+      <TabItem Header="Команды">
+        <ScrollViewer>
+          <Grid Margin="6,22" RowDefinitions="Auto,Auto,*">
+            <StackPanel Spacing="7">
+              <TextBlock Classes="h1" Text="Что сделать?" />
+              <TextBlock
+                  Classes="muted"
+                  Text="Напиши команду так же, как произнёс бы её вслух." />
+            </StackPanel>
+
+            <Border Grid.Row="1" Margin="0,22,0,18" Classes="card">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <TextBox
+                    FontSize="16"
+                    Text="{Binding CommandText}"
+                    PlaceholderText="Например: открой калькулятор" />
+                <Button
+                    Grid.Column="1"
+                    Classes="primary"
+                    Command="{Binding ExecuteCommand}"
+                    Content="Выполнить" />
+              </Grid>
+            </Border>
+
+            <Grid Grid.Row="2" ColumnDefinitions="1.1*,0.9*" ColumnSpacing="18">
+              <Border Classes="card">
+                <StackPanel Spacing="14">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="h2" Text="Последние команды" />
+                    <TextBlock Grid.Column="1" Classes="muted" Text="{Binding History.Count, StringFormat={}{0} записей}" />
+                  </Grid>
+
+                  <ItemsControl ItemsSource="{Binding History}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Border
+                            Margin="0,0,0,8"
+                            Padding="12"
+                            Background="#181B25"
+                            CornerRadius="10">
+                          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                            <Border
+                                Width="26"
+                                Height="26"
+                                Background="#292444"
+                                CornerRadius="8">
+                              <TextBlock
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  Text="{Binding StatusGlyph}" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="3">
+                              <TextBlock FontWeight="SemiBold" Text="{Binding Request}" TextWrapping="Wrap" />
+                              <TextBlock Classes="muted" FontSize="12" Text="{Binding Response}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Classes="muted" FontSize="11" Text="{Binding Timestamp}" />
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+
+                  <StackPanel
+                      IsVisible="{Binding !History.Count}"
+                      HorizontalAlignment="Center"
+                      Margin="0,25"
+                      Spacing="8">
+                    <TextBlock HorizontalAlignment="Center" FontSize="28" Text="⌁" />
+                    <TextBlock Classes="muted" Text="История пока пуста" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+
+              <StackPanel Grid.Column="1" Spacing="18">
+                <Border Classes="card">
+                  <StackPanel Spacing="12">
+                    <TextBlock Classes="h2" Text="Быстрый старт" />
+                    <TextBlock
+                        Classes="muted"
+                        Text="Попробуй одну из команд:"
+                        TextWrapping="Wrap" />
+                    <TextBlock Text="• открой калькулятор" />
+                    <TextBlock Text="• найди погоду в Калининграде" />
+                    <TextBlock Text="• сколько будет (42 + 8) / 5" />
+                    <TextBlock Text="• который час" />
+                    <TextBlock Text="• следующий трек" />
+                    <Button
+                        HorizontalAlignment="Left"
+                        Classes="secondary"
+                        Command="{Binding UseExampleCommand}"
+                        Content="Показать возможности" />
+                  </StackPanel>
+                </Border>
+
+                <Border
+                    Padding="18"
+                    Background="#17162B"
+                    BorderBrush="#35305D"
+                    BorderThickness="1"
+                    CornerRadius="16">
+                  <StackPanel Spacing="7">
+                    <TextBlock Foreground="#B9AFFF" FontWeight="SemiBold" Text="Голосовой контур" />
+                    <TextBlock
+                        Classes="muted"
+                        FontSize="12"
+                        Text="{Binding VoiceStatusText}"
+                        TextWrapping="Wrap" />
+                    <ProgressBar
+                        Height="5"
+                        Maximum="100"
+                        Value="{Binding VoiceInputLevel}" />
+                    <TextBlock
+                        Classes="muted"
+                        FontSize="11"
+                        Text="{Binding VoiceActivityText}"
+                        TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </Grid>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="Сценарии">
+        <Grid Margin="6,22" ColumnDefinitions="0.9*,1.1*" ColumnSpacing="18">
+          <Border Classes="card">
+            <StackPanel Spacing="14">
+              <TextBlock Classes="h2" Text="Мои сценарии" />
+              <TextBlock
+                  Classes="muted"
+                  Text="Одна фраза запускает последовательность безопасных команд."
+                  TextWrapping="Wrap" />
+
+              <ListBox
+                  MinHeight="300"
+                  ItemsSource="{Binding Scenarios}"
+                  SelectedItem="{Binding SelectedScenario}">
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <Border Margin="0,3" Padding="12" Background="#181B25" CornerRadius="10">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="3">
+                          <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
+                          <TextBlock Classes="muted" FontSize="12" Text="{Binding Trigger}" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Classes="muted" Text="{Binding Summary}" />
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+
+              <Button
+                  HorizontalAlignment="Left"
+                  Classes="secondary"
+                  Command="{Binding DeleteScenarioCommand}"
+                  Content="Удалить выбранный" />
+            </StackPanel>
+          </Border>
+
+          <Border Grid.Column="1" Classes="card">
+            <StackPanel Spacing="12">
+              <TextBlock Classes="h2" Text="Новый сценарий" />
+              <TextBlock Classes="muted" Text="Название" />
+              <TextBox Text="{Binding ScenarioName}" PlaceholderText="Начало рабочего дня" />
+              <TextBlock Classes="muted" Text="Фраза запуска" />
+              <TextBox Text="{Binding ScenarioTrigger}" PlaceholderText="начинаем работать" />
+              <TextBlock Classes="muted" Text="Действия — по одному на строку" />
+              <TextBox
+                  Height="150"
+                  AcceptsReturn="True"
+                  Text="{Binding ScenarioCommandsText}"
+                  TextWrapping="Wrap"
+                  PlaceholderText="открой почта&#10;открой github&#10;открой терминал" />
+              <Button
+                  HorizontalAlignment="Left"
+                  Classes="primary"
+                  Command="{Binding AddScenarioCommand}"
+                  Content="Сохранить сценарий" />
+            </StackPanel>
+          </Border>
+        </Grid>
+      </TabItem>
+
+      <TabItem Header="Настройки">
+        <ScrollViewer>
+          <Grid Margin="6,22" ColumnDefinitions="1*,1*" ColumnSpacing="18">
+            <StackPanel Spacing="18">
+              <Border Classes="card">
+                <StackPanel Spacing="12">
+                  <TextBlock Classes="h2" Text="Ассистент" />
+                  <TextBlock Classes="muted" Text="Имя" />
+                  <TextBox MaxLength="24" Text="{Binding AssistantName}" />
+                  <CheckBox
+                      Content="Озвучивать ответы"
+                      IsChecked="{Binding SpeakResponses}" />
+                  <CheckBox
+                      Content="Голосовая активация"
+                      IsChecked="{Binding VoiceActivationEnabled}" />
+                  <TextBlock
+                      Classes="muted"
+                      FontSize="11"
+                      Text="{Binding VoiceStatusText}"
+                      TextWrapping="Wrap" />
+                  <TextBlock Classes="muted" FontSize="11" Text="{Binding VoiceActivityText}" TextWrapping="Wrap" />
+                  <ProgressBar
+                      Height="5"
+                      Maximum="100"
+                      Value="{Binding VoiceInputLevel}" />
+                  <Button
+                      HorizontalAlignment="Left"
+                      Classes="secondary"
+                      Command="{Binding DownloadVoiceModelCommand}"
+                      Content="{Binding VoiceModelButtonText}" />
+                </StackPanel>
+              </Border>
+
+              <Border Classes="card">
+                <StackPanel Spacing="10">
+                  <TextBlock Classes="h2" Text="Голос ответа" />
+                  <TextBlock
+                      Classes="muted"
+                      FontSize="12"
+                      Text="{Binding NeuralVoiceStatusText}"
+                      TextWrapping="Wrap" />
+                  <ProgressBar
+                      Height="5"
+                      Maximum="100"
+                      Value="{Binding NeuralVoiceDownloadProgress}" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button
+                        Classes="secondary"
+                        Command="{Binding DownloadNeuralVoiceCommand}"
+                        Content="{Binding NeuralVoiceButtonText}" />
+                    <Button
+                        Classes="secondary"
+                        Command="{Binding TestVoiceCommand}"
+                        Content="Проверить голос" />
+                  </StackPanel>
+                  <TextBlock
+                      Classes="muted"
+                      FontSize="11"
+                      Text="Piper/Sherpa-ONNX работает локально и не отправляет текст в интернет."
+                      TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+
+              <Border Classes="card">
+                <StackPanel Spacing="10">
+                  <TextBlock Classes="h2" Text="ИИ-планировщик" />
+                  <CheckBox
+                      Content="Использовать ИИ для неизвестных команд"
+                      IsChecked="{Binding AiEnabled}" />
+                  <TextBlock Classes="muted" FontSize="11" Text="OpenAI-compatible endpoint" />
+                  <TextBox
+                      Text="{Binding AiEndpoint}"
+                      PlaceholderText="https://api.openai.com/v1/chat/completions" />
+                  <TextBlock Classes="muted" FontSize="11" Text="Модель" />
+                  <TextBox
+                      Text="{Binding AiModel}"
+                      PlaceholderText="gpt-4o-mini" />
+                  <TextBlock Classes="muted" FontSize="11" Text="API-ключ" />
+                  <TextBox
+                      PasswordChar="●"
+                      Text="{Binding AiApiKey}"
+                      PlaceholderText="{Binding AiApiKeyWatermark}" />
+                  <TextBlock
+                      Classes="muted"
+                      FontSize="11"
+                      Text="{Binding AiStatusText}"
+                      TextWrapping="Wrap" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button
+                        Classes="secondary"
+                        Command="{Binding TestAiCommand}"
+                        Content="Проверить ИИ" />
+                    <Button
+                        Classes="secondary"
+                        Command="{Binding DeleteAiApiKeyCommand}"
+                        Content="Удалить ключ" />
+                  </StackPanel>
+                  <TextBlock
+                      Classes="muted"
+                      FontSize="11"
+                      Text="Модель формирует только план. Каждый инструмент и аргумент повторно проверяется приложением перед выполнением."
+                      TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+
+              <Border Classes="card">
+                <StackPanel Spacing="10">
+                  <TextBlock Classes="h2" Text="Поиск" />
+                  <TextBlock Classes="muted" Text="Поисковая система" />
+                  <ComboBox
+                      ItemsSource="{Binding SearchProviders}"
+                      SelectedItem="{Binding SearchProvider}" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Spacing="18">
+              <Border Classes="card">
+                <StackPanel Spacing="10">
+                  <TextBlock Classes="h2" Text="Приложения" />
+                  <TextBlock
+                      Classes="muted"
+                      FontSize="12"
+                      Text="Формат: голосовое имя=исполняемый файл"
+                      TextWrapping="Wrap" />
+                  <TextBox
+                      Height="145"
+                      AcceptsReturn="True"
+                      Text="{Binding ApplicationAliasesText}"
+                      TextWrapping="NoWrap" />
+                </StackPanel>
+              </Border>
+
+              <Border Classes="card">
+                <StackPanel Spacing="10">
+                  <TextBlock Classes="h2" Text="Сайты" />
+                  <TextBlock Classes="muted" FontSize="12" Text="Формат: голосовое имя=https://адрес" />
+                  <TextBox
+                      Height="145"
+                      AcceptsReturn="True"
+                      Text="{Binding SiteAliasesText}"
+                      TextWrapping="NoWrap" />
+                </StackPanel>
+              </Border>
+
+              <Button
+                  HorizontalAlignment="Right"
+                  Classes="primary"
+                  Command="{Binding SaveSettingsCommand}"
+                  Content="Сохранить настройки" />
+            </StackPanel>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+
+    <Border
+        Grid.Row="2"
+        Padding="26,12"
+        Background="#0E1017"
+        BorderBrush="#222634"
+        BorderThickness="0,1,0,0">
+      <TextBlock Classes="muted" FontSize="12" Text="{Binding StatusText}" TextWrapping="Wrap" />
+    </Border>
+  </Grid>
+</Window>

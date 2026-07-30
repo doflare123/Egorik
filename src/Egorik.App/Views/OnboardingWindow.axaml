@@ -1,0 +1,70 @@
+<Window
+    x:Class="Egorik.App.Views.OnboardingWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Width="620"
+    Height="480"
+    CanResize="False"
+    ShowInTaskbar="True"
+    WindowStartupLocation="CenterScreen"
+    Title="Первый запуск">
+  <Grid Margin="42">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <StackPanel Spacing="12">
+      <Border
+          Width="52"
+          Height="52"
+          HorizontalAlignment="Left"
+          Background="#2B2354"
+          CornerRadius="16">
+        <TextBlock
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            FontSize="25"
+            Text="✦" />
+      </Border>
+      <TextBlock Classes="h1" Text="Привет. Давай познакомимся" />
+      <TextBlock
+          MaxWidth="500"
+          Classes="muted"
+          FontSize="15"
+          Text="Это имя будет использоваться в интерфейсе и в начале команд. Фразу голосовой активации можно будет протестировать отдельно."
+          TextWrapping="Wrap" />
+    </StackPanel>
+
+    <Border
+        Grid.Row="1"
+        Margin="0,28,0,24"
+        Classes="card">
+      <StackPanel VerticalAlignment="Center" Spacing="10">
+        <TextBlock Classes="h2" Text="Меня будут звать…" />
+        <TextBox
+            FontSize="22"
+            MaxLength="24"
+            Text="{Binding AssistantName}"
+            PlaceholderText="Егорик" />
+        <TextBlock
+            Foreground="#FF8E9B"
+            Text="{Binding ValidationMessage}"
+            TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
+
+    <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
+      <TextBlock
+          VerticalAlignment="Center"
+          Classes="muted"
+          Text="Данные хранятся локально на компьютере." />
+      <Button
+          Grid.Column="1"
+          Classes="primary"
+          Click="ContinueButton_OnClick"
+          Content="Продолжить  →" />
+    </Grid>
+  </Grid>
+</Window>

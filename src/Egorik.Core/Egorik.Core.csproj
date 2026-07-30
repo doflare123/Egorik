@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Egorik.Core</RootNamespace>
+    <AssemblyName>Egorik.Core</AssemblyName>
+  </PropertyGroup>
+</Project>

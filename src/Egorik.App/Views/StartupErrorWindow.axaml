@@ -1,0 +1,34 @@
+<Window
+    x:Class="Egorik.App.Views.StartupErrorWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Width="620"
+    Height="390"
+    CanResize="False"
+    WindowStartupLocation="CenterScreen"
+    Title="Egorik — ошибка запуска">
+  <Grid Margin="36" RowDefinitions="Auto,*,Auto">
+    <StackPanel Spacing="10">
+      <TextBlock Classes="h1" Text="Не удалось запустить приложение" />
+      <TextBlock
+          Classes="muted"
+          Text="Ошибка сохранена в диагностический журнал. Настройки и сценарии не удалялись."
+          TextWrapping="Wrap" />
+    </StackPanel>
+
+    <Border Grid.Row="1" Margin="0,24" Classes="card">
+      <StackPanel Spacing="12">
+        <TextBlock FontWeight="SemiBold" Text="Причина" />
+        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        <TextBlock Classes="muted" FontSize="11" Text="{Binding LogPath}" TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
+
+    <Button
+        Grid.Row="2"
+        HorizontalAlignment="Right"
+        Classes="primary"
+        Click="CloseButton_OnClick"
+        Content="Закрыть" />
+  </Grid>
+</Window>
