@@ -6,6 +6,7 @@ using Avalonia.Threading;
 using Egorik.App.ViewModels;
 using Egorik.App.Views;
 using Egorik.Core.Configuration;
+using Egorik.Core.Platform;
 using Egorik.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -14,8 +15,21 @@ namespace Egorik.App;
 public sealed partial class App : Application
 {
     private ServiceProvider? _services;
+    private ScreenWakeOverlayWindow? _wakeOverlayWindow;
+    private IClassicDesktopStyleApplicationLifetime? _desktopLifetime;
+    private MainWindow? _mainWindow;
+    private TrayIcon? _trayIcon;
+    private bool _isExitRequested;
 
-    public override void Initialize() => AvaloniaXamlLoader.Load(this);
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+        _trayIcon = TrayIcon.GetIcons(this)?.FirstOrDefault();
+        if (_trayIcon is not null)
+        {
+            _trayIcon.Icon = TrayIconFactory.Create();
+        }
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {
@@ -26,8 +40,13 @@ public sealed partial class App : Application
         }
 
         _services = Bootstrapper.BuildServices();
+        _desktopLifetime = desktop;
         desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-        desktop.Exit += (_, _) => _services.Dispose();
+        desktop.Exit += (_, _) =>
+        {
+            _wakeOverlayWindow?.Dispose();
+            _services.Dispose();
+        };
 
         Dispatcher.UIThread.Post(() => InitializeDesktopAsync(desktop));
         base.OnFrameworkInitializationCompleted();
@@ -88,17 +107,39 @@ public sealed partial class App : Application
     private async Task ShowMainWindowAsync(
         IClassicDesktopStyleApplicationLifetime desktop)
     {
-        var viewModel = _services!.GetRequiredService<MainViewModel>();
-        await viewModel.InitializeAsync();
+        var services = _services!;
+        var viewModel = services.GetRequiredService<MainViewModel>();
+        var overlayWindow = new ScreenWakeOverlayWindow(
+            services.GetRequiredService<IDesktopOverlayWindowService>());
+        overlayWindow.Connect(viewModel);
+
+        try
+        {
+            await viewModel.InitializeAsync();
+        }
+        catch
+        {
+            overlayWindow.Dispose();
+            throw;
+        }
 
         var mainWindow = new MainWindow
         {
             DataContext = viewModel
         };
+        mainWindow.Closing += OnMainWindowClosing;
+
+        _wakeOverlayWindow?.Dispose();
+        _wakeOverlayWindow = overlayWindow;
+        _mainWindow = mainWindow;
+        if (_trayIcon is not null)
+        {
+            _trayIcon.IsVisible = true;
+        }
 
         desktop.MainWindow = mainWindow;
         mainWindow.Show();
-        desktop.ShutdownMode = ShutdownMode.OnLastWindowClose;
+        desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
     }
 
     private async Task ShowStartupErrorAsync(
@@ -121,5 +162,66 @@ public sealed partial class App : Application
         desktop.MainWindow = errorWindow;
         errorWindow.Show();
         desktop.ShutdownMode = ShutdownMode.OnLastWindowClose;
+    }
+
+    private void OnMainWindowClosing(object? sender, WindowClosingEventArgs eventArgs)
+    {
+        if (_isExitRequested)
+        {
+            return;
+        }
+
+        eventArgs.Cancel = true;
+        HideMainWindow();
+    }
+
+    private void OnTrayIconClicked(object? sender, EventArgs eventArgs) =>
+        ShowMainWindow();
+
+    private void OnShowMainWindowClicked(object? sender, EventArgs eventArgs) =>
+        ShowMainWindow();
+
+    private void OnExitClicked(object? sender, EventArgs eventArgs)
+    {
+        _isExitRequested = true;
+        if (_trayIcon is not null)
+        {
+            _trayIcon.IsVisible = false;
+        }
+
+        _mainWindow?.Close();
+        _desktopLifetime?.Shutdown();
+    }
+
+    private void ShowMainWindow()
+    {
+        if (_mainWindow is null)
+        {
+            return;
+        }
+
+        _mainWindow.ShowInTaskbar = true;
+        if (!_mainWindow.IsVisible)
+        {
+            _mainWindow.Show();
+        }
+
+        if (_mainWindow.WindowState == WindowState.Minimized)
+        {
+            _mainWindow.WindowState = WindowState.Normal;
+        }
+
+        _mainWindow.Activate();
+    }
+
+    private void HideMainWindow()
+    {
+        if (_mainWindow is null)
+        {
+            return;
+        }
+
+        _mainWindow.ShowInTaskbar = false;
+        _mainWindow.Hide();
     }
 }

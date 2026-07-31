@@ -1,0 +1,101 @@
+<Window
+    x:Class="Egorik.App.Views.ScreenWakeOverlayWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="Transparent"
+    CanMaximize="False"
+    CanMinimize="False"
+    CanResize="False"
+    Focusable="False"
+    IsHitTestVisible="False"
+    ShowActivated="False"
+    ShowInTaskbar="False"
+    Title="Egorik Voice Overlay"
+    Topmost="True"
+    TransparencyBackgroundFallback="Transparent"
+    TransparencyLevelHint="Transparent"
+    WindowDecorations="None"
+    WindowStartupLocation="Manual">
+  <Window.Styles>
+    <Style Selector="Rectangle.wake-ambient">
+      <Style.Animations>
+        <Animation
+            Duration="0:0:1.4"
+            IterationCount="INFINITE"
+            PlaybackDirection="Alternate">
+          <KeyFrame Cue="0%">
+            <Setter Property="Opacity" Value="0.22" />
+          </KeyFrame>
+          <KeyFrame Cue="55%">
+            <Setter Property="Opacity" Value="0.58" />
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="Opacity" Value="0.34" />
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+
+    <Style Selector="Rectangle.wake-tracer">
+      <Style.Animations>
+        <Animation Duration="0:0:3.8" IterationCount="INFINITE">
+          <KeyFrame Cue="0%">
+            <Setter Property="Opacity" Value="0.32" />
+            <Setter Property="StrokeDashOffset" Value="0" />
+          </KeyFrame>
+          <KeyFrame Cue="15%">
+            <Setter Property="Opacity" Value="0.95" />
+          </KeyFrame>
+          <KeyFrame Cue="85%">
+            <Setter Property="Opacity" Value="0.95" />
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="Opacity" Value="0.32" />
+            <Setter Property="StrokeDashOffset" Value="-1180" />
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+  </Window.Styles>
+
+  <Grid ClipToBounds="True">
+    <Rectangle
+        Margin="3"
+        Classes="wake-ambient"
+        RadiusX="18"
+        RadiusY="18"
+        StrokeThickness="12">
+      <Rectangle.Stroke>
+        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+          <GradientStop Color="#4F8CFF" Offset="0" />
+          <GradientStop Color="#7B6CFF" Offset="0.28" />
+          <GradientStop Color="#C66BFF" Offset="0.52" />
+          <GradientStop Color="#FF6F9C" Offset="0.76" />
+          <GradientStop Color="#65DBFF" Offset="1" />
+        </LinearGradientBrush>
+      </Rectangle.Stroke>
+      <Rectangle.Effect>
+        <BlurEffect Radius="10" />
+      </Rectangle.Effect>
+    </Rectangle>
+
+    <Rectangle
+        Margin="2"
+        Classes="wake-tracer"
+        RadiusX="18"
+        RadiusY="18"
+        StrokeDashArray="180,1000"
+        StrokeLineCap="Round"
+        StrokeThickness="3">
+      <Rectangle.Stroke>
+        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+          <GradientStop Color="#79B4FF" Offset="0" />
+          <GradientStop Color="#9D7CFF" Offset="0.3" />
+          <GradientStop Color="#F47CFF" Offset="0.56" />
+          <GradientStop Color="#FF8DA8" Offset="0.78" />
+          <GradientStop Color="#8DEBFF" Offset="1" />
+        </LinearGradientBrush>
+      </Rectangle.Stroke>
+    </Rectangle>
+  </Grid>
+</Window>

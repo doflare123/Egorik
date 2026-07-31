@@ -32,6 +32,7 @@ internal static class Bootstrapper
         services.AddSingleton<IApplicationLauncher, DesktopApplicationLauncher>();
         services.AddSingleton<IWebBrowserService, DesktopWebBrowserService>();
         services.AddSingleton<IMediaControlService, DesktopMediaControlService>();
+        services.AddSingleton<IDesktopOverlayWindowService, DesktopOverlayWindowService>();
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<IAiApiKeyStore, DpapiAiApiKeyStore>();
         services.AddSingleton<IAiPlanner, OpenAiCompatiblePlanner>();

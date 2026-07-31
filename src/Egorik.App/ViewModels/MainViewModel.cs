@@ -22,6 +22,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly IAiPlanner _aiPlanner;
     private readonly IAiToolExecutor _aiToolExecutor;
     private readonly IAiApiKeyStore _aiApiKeyStore;
+    private readonly VoiceWakeIndicator _voiceWakeIndicator = new();
     private string _commandText = string.Empty;
     private string _statusText = "Готов к команде";
     private string _assistantName;
@@ -49,6 +50,7 @@ public sealed class MainViewModel : ViewModelBase
     private string _aiModel;
     private string _aiApiKey = string.Empty;
     private string _aiStatusText;
+    private bool _isWakeAnimationActive;
 
     public MainViewModel(
         AssistantEngine engine,
@@ -181,6 +183,12 @@ public sealed class MainViewModel : ViewModelBase
     {
         get => _voiceInputLevel;
         private set => SetProperty(ref _voiceInputLevel, value);
+    }
+
+    public bool IsWakeAnimationActive
+    {
+        get => _isWakeAnimationActive;
+        private set => SetProperty(ref _isWakeAnimationActive, value);
     }
 
     public string NeuralVoiceStatusText
@@ -789,6 +797,7 @@ public sealed class MainViewModel : ViewModelBase
         VoiceInputStateChangedEventArgs eventArgs) =>
         Dispatcher.UIThread.Post(() =>
         {
+            IsWakeAnimationActive = _voiceWakeIndicator.ObserveState(eventArgs.State);
             VoiceStatusText = eventArgs.Message;
             StatusText = eventArgs.Message;
         });
@@ -798,6 +807,7 @@ public sealed class MainViewModel : ViewModelBase
         VoiceCommandRecognizedEventArgs eventArgs) =>
         Dispatcher.UIThread.Post(async () =>
         {
+            IsWakeAnimationActive = _voiceWakeIndicator.AcceptCommand();
             CommandText = eventArgs.Text;
             await ExecuteAsync();
         });
@@ -807,6 +817,9 @@ public sealed class MainViewModel : ViewModelBase
         VoiceInputActivityEventArgs eventArgs) =>
         Dispatcher.UIThread.Post(() =>
         {
+            IsWakeAnimationActive = _voiceWakeIndicator.ObserveActivity(
+                eventArgs.PartialText,
+                AssistantName);
             VoiceInputLevel = eventArgs.Level * 100;
             if (!string.IsNullOrWhiteSpace(eventArgs.PartialText))
             {

@@ -3,6 +3,23 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     RequestedThemeVariant="Dark">
+  <TrayIcon.Icons>
+    <TrayIcons>
+      <TrayIcon
+          IsVisible="False"
+          ToolTipText="Егорик — голосовой ассистент"
+          Clicked="OnTrayIconClicked">
+        <TrayIcon.Menu>
+          <NativeMenu>
+            <NativeMenuItem Header="Открыть Егорик" Click="OnShowMainWindowClicked" />
+            <NativeMenuItemSeparator />
+            <NativeMenuItem Header="Полный выход" Click="OnExitClicked" />
+          </NativeMenu>
+        </TrayIcon.Menu>
+      </TrayIcon>
+    </TrayIcons>
+  </TrayIcon.Icons>
+
   <Application.Resources>
     <Color x:Key="AppBackgroundColor">#0A0B10</Color>
     <Color x:Key="SurfaceColor">#13151D</Color>
