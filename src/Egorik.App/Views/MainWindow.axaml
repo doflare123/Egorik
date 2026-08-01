@@ -378,6 +378,22 @@
                 </StackPanel>
               </Border>
 
+              <Border Classes="card">
+                <StackPanel Spacing="10">
+                  <TextBlock Classes="h2" Text="Книги Excel" />
+                  <TextBlock
+                      Classes="muted"
+                      FontSize="12"
+                      Text="Разрешённые для чтения .xlsx: имя=полный путь"
+                      TextWrapping="Wrap" />
+                  <TextBox
+                      Height="105"
+                      AcceptsReturn="True"
+                      Text="{Binding DocumentAliasesText}"
+                      TextWrapping="NoWrap" />
+                </StackPanel>
+              </Border>
+
               <Button
                   HorizontalAlignment="Right"
                   Classes="primary"

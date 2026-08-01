@@ -1,12 +1,14 @@
 using Egorik.App.ViewModels;
 using Egorik.Core;
 using Egorik.Core.Ai;
+using Egorik.Core.Applications;
 using Egorik.Core.Commands;
 using Egorik.Core.Configuration;
 using Egorik.Core.Platform;
 using Egorik.Core.Scenarios;
 using Egorik.Core.Speech;
 using Egorik.Infrastructure.Ai;
+using Egorik.Infrastructure.Applications;
 using Egorik.Infrastructure.Commands;
 using Egorik.Infrastructure.Persistence;
 using Egorik.Infrastructure.Platform;
@@ -29,9 +31,19 @@ internal static class Bootstrapper
         services.AddSingleton<IAssistantSettingsService, JsonAssistantSettingsService>();
         services.AddSingleton<IScenarioRepository, JsonScenarioRepository>();
 
+        services.AddSingleton<IInstalledApplicationLocator, DesktopInstalledApplicationLocator>();
         services.AddSingleton<IApplicationLauncher, DesktopApplicationLauncher>();
         services.AddSingleton<IWebBrowserService, DesktopWebBrowserService>();
         services.AddSingleton<IMediaControlService, DesktopMediaControlService>();
+        services.AddSingleton<IYandexMusicController, DesktopYandexMusicController>();
+        services.AddSingleton<IOfficeDocumentService, OpenXmlOfficeDocumentService>();
+        services.AddSingleton<ISteamGameCatalog, SteamGameCatalog>();
+        services.AddSingleton<IApplicationIntegration, DefaultBrowserApplicationIntegration>();
+        services.AddSingleton<IApplicationIntegration, SteamApplicationIntegration>();
+        services.AddSingleton<IApplicationIntegration, YandexMusicApplicationIntegration>();
+        services.AddSingleton<IApplicationIntegration, MicrosoftWordApplicationIntegration>();
+        services.AddSingleton<IApplicationIntegration, MicrosoftExcelApplicationIntegration>();
+        services.AddSingleton<IApplicationActionRegistry, ApplicationActionRegistry>();
         services.AddSingleton<IDesktopOverlayWindowService, DesktopOverlayWindowService>();
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<IAiApiKeyStore, DpapiAiApiKeyStore>();
@@ -40,6 +52,8 @@ internal static class Bootstrapper
         services.AddSingleton<IAiTool, WebsiteOpenAiTool>();
         services.AddSingleton<IAiTool, WebSearchAiTool>();
         services.AddSingleton<IAiTool, MediaControlAiTool>();
+        services.AddSingleton<IAiTool, ApplicationActionAiTool>();
+        services.AddSingleton<IAiTool, SpreadsheetSearchAiTool>();
         services.AddSingleton<IAiTool, CalculatorAiTool>();
         services.AddSingleton<IAiTool, DateTimeAiTool>();
         services.AddSingleton<IAiTool, ClientNavigateAiTool>();
@@ -55,6 +69,7 @@ internal static class Bootstrapper
         services.AddSingleton<IAssistantCommand, NavigationCommand>();
         services.AddSingleton<IAssistantCommand, OpenSiteCommand>();
         services.AddSingleton<IAssistantCommand, OpenApplicationCommand>();
+        services.AddSingleton<IAssistantCommand, ApplicationActionCommand>();
         services.AddSingleton<IAssistantCommand, WebSearchCommand>();
         services.AddSingleton<IAssistantCommand, CalculatorCommand>();
         services.AddSingleton<IAssistantCommand, DateTimeCommand>();

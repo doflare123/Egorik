@@ -32,7 +32,7 @@ public sealed partial class OpenSiteCommand(
         var site = settings.Current.Sites.Keys
             .OrderByDescending(alias => alias.Length)
             .FirstOrDefault(alias =>
-                string.Equals(TextNormalizer.Normalize(alias), explicitTarget, StringComparison.Ordinal));
+                KnownEntityMatcher.IsMatch(alias, explicitTarget));
 
         if (site is not null)
         {

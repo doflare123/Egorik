@@ -26,7 +26,7 @@ public sealed class OpenApplicationCommand(
         var application = settings.Current.Applications.Keys
             .OrderByDescending(alias => alias.Length)
             .FirstOrDefault(alias =>
-                string.Equals(TextNormalizer.Normalize(alias), target, StringComparison.Ordinal));
+                KnownEntityMatcher.IsMatch(alias, target));
 
         return ValueTask.FromResult(application is null
             ? null

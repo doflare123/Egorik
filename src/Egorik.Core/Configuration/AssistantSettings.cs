@@ -24,6 +24,9 @@ public sealed class AssistantSettings
 
     public Dictionary<string, string> Sites { get; set; } =
         new(StringComparer.OrdinalIgnoreCase);
+
+    public Dictionary<string, string> Documents { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
 }
 
 public interface IAssistantSettingsService

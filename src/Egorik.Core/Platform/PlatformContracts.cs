@@ -9,6 +9,11 @@ public interface IApplicationLauncher
         CancellationToken cancellationToken = default);
 }
 
+public interface IInstalledApplicationLocator
+{
+    string? FindExecutable(string executableName);
+}
+
 public interface IWebBrowserService
 {
     ValueTask<LaunchResult> OpenUrlAsync(
@@ -36,6 +41,53 @@ public interface IMediaControlService
 {
     ValueTask<LaunchResult> ExecuteAsync(
         MediaAction action,
+        CancellationToken cancellationToken = default);
+}
+
+public enum YandexMusicAction
+{
+    PlayPause,
+    Next,
+    Previous,
+    Stop
+}
+
+public interface IYandexMusicController
+{
+    ValueTask<LaunchResult> OpenAsync(
+        CancellationToken cancellationToken = default);
+
+    ValueTask<LaunchResult> SearchAsync(
+        string query,
+        CancellationToken cancellationToken = default);
+
+    ValueTask<LaunchResult> StartMyWaveAsync(
+        CancellationToken cancellationToken = default);
+
+    ValueTask<LaunchResult> ExecuteAsync(
+        YandexMusicAction action,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed record SpreadsheetCellMatch(
+    string Sheet,
+    string Cell,
+    string Value);
+
+public sealed record SpreadsheetSearchResult(
+    bool IsSuccess,
+    string Message,
+    IReadOnlyList<SpreadsheetCellMatch> Matches);
+
+public interface IOfficeDocumentService
+{
+    ValueTask<LaunchResult> CreateWordNoteAsync(
+        string text,
+        CancellationToken cancellationToken = default);
+
+    ValueTask<SpreadsheetSearchResult> SearchWorkbookAsync(
+        string path,
+        string query,
         CancellationToken cancellationToken = default);
 }
 

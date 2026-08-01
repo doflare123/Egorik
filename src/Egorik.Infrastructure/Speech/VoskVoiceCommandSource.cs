@@ -72,9 +72,20 @@ public sealed class VoskVoiceCommandSource(
                 }
 
                 Vosk.Vosk.SetLogLevel(-1);
-                _model = new Model(modelService.ModelDirectory);
-                _recognizer = new VoskRecognizer(_model, 16000);
-                _recognizer.SetWords(false);
+                if (_model is null)
+                {
+                    _model = new Model(modelService.ModelDirectory);
+                }
+
+                if (_recognizer is null)
+                {
+                    _recognizer = new VoskRecognizer(_model, 16000);
+                    _recognizer.SetWords(false);
+                }
+                else
+                {
+                    _recognizer.Reset();
+                }
 
                 _hasReceivedAudio = false;
                 _lastPartialText = string.Empty;
@@ -107,6 +118,30 @@ public sealed class VoskVoiceCommandSource(
         return ValueTask.CompletedTask;
     }
 
+    public ValueTask PauseAsync(CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_syncRoot)
+        {
+            ++_startVersion;
+            ++_armVersion;
+            DisposeWaveInput();
+        }
+
+        ActivityChanged?.Invoke(this, new VoiceInputActivityEventArgs(0, string.Empty));
+        SetState(
+            modelService.IsInstalled
+                ? VoiceInputState.Disabled
+                : VoiceInputState.ModelMissing,
+            "Голосовой ввод временно приостановлен.");
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask ResumeAsync(CancellationToken cancellationToken = default) =>
+        StartAsync(cancellationToken);
+
     public ValueTask StopAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -116,31 +151,15 @@ public sealed class VoskVoiceCommandSource(
             ++_startVersion;
             ++_armVersion;
 
-            if (_waveInput is null)
-            {
-                SetState(
-                    modelService.IsInstalled
-                        ? VoiceInputState.Disabled
-                        : VoiceInputState.ModelMissing,
-                    "Голосовая активация выключена.");
-                return ValueTask.CompletedTask;
-            }
-
-            _waveInput.DataAvailable -= OnDataAvailable;
-            _waveInput.RecordingStopped -= OnRecordingStopped;
-
-            try
-            {
-                _waveInput.StopRecording();
-            }
-            finally
-            {
-                DisposeRecognitionObjects();
-            }
+            DisposeRecognitionObjects();
         }
 
         ActivityChanged?.Invoke(this, new VoiceInputActivityEventArgs(0, string.Empty));
-        SetState(VoiceInputState.Disabled, "Голосовая активация выключена.");
+        SetState(
+            modelService.IsInstalled
+                ? VoiceInputState.Disabled
+                : VoiceInputState.ModelMissing,
+            "Голосовая активация выключена.");
         return ValueTask.CompletedTask;
     }
 
@@ -409,12 +428,45 @@ public sealed class VoskVoiceCommandSource(
 
     private void DisposeRecognitionObjects()
     {
-        _waveInput?.Dispose();
-        _recognizer?.Dispose();
-        _model?.Dispose();
+        try
+        {
+            DisposeWaveInput();
+        }
+        finally
+        {
+            try
+            {
+                _recognizer?.Dispose();
+            }
+            finally
+            {
+                _model?.Dispose();
+                _recognizer = null;
+                _model = null;
+                _hasReceivedAudio = false;
+            }
+        }
+    }
+
+    private void DisposeWaveInput()
+    {
+        if (_waveInput is null)
+        {
+            return;
+        }
+
+        var waveInput = _waveInput;
         _waveInput = null;
-        _recognizer = null;
-        _model = null;
-        _hasReceivedAudio = false;
+        waveInput.DataAvailable -= OnDataAvailable;
+        waveInput.RecordingStopped -= OnRecordingStopped;
+        try
+        {
+            waveInput.StopRecording();
+        }
+        finally
+        {
+            waveInput.Dispose();
+            _hasReceivedAudio = false;
+        }
     }
 }

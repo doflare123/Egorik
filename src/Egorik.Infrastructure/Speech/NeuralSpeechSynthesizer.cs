@@ -6,10 +6,11 @@ namespace Egorik.Infrastructure.Speech;
 
 public sealed class NeuralSpeechSynthesizer(
     INeuralVoiceModelService modelService,
-    WindowsSpeechSynthesizer fallback) : ISpeechSynthesizer
+    WindowsSpeechSynthesizer fallback) : ISpeechSynthesizer, IDisposable
 {
     private readonly SemaphoreSlim _speechLock = new(1, 1);
     private OfflineTts? _tts;
+    private bool _disposed;
 
     public bool IsAvailable => modelService.IsInstalled || fallback.IsAvailable;
 
@@ -22,6 +23,7 @@ public sealed class NeuralSpeechSynthesizer(
         string text,
         CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (string.IsNullOrWhiteSpace(text))
         {
             return;
@@ -40,7 +42,28 @@ public sealed class NeuralSpeechSynthesizer(
         }
         finally
         {
+            ReleaseNeuralResources();
             _speechLock.Release();
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _speechLock.Wait();
+        try
+        {
+            ReleaseNeuralResources();
+            _disposed = true;
+        }
+        finally
+        {
+            _speechLock.Release();
+            _speechLock.Dispose();
         }
     }
 
@@ -117,6 +140,12 @@ public sealed class NeuralSpeechSynthesizer(
 
         _tts = new OfflineTts(config);
         return _tts;
+    }
+
+    private void ReleaseNeuralResources()
+    {
+        _tts?.Dispose();
+        _tts = null;
     }
 
     private static async Task PlayWaveFileAsync(

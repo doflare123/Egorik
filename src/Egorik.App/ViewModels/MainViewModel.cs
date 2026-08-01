@@ -29,6 +29,7 @@ public sealed class MainViewModel : ViewModelBase
     private string _searchProvider;
     private string _applicationAliasesText;
     private string _siteAliasesText;
+    private string _documentAliasesText;
     private bool _speakResponses;
     private bool _voiceActivationEnabled;
     private int _selectedTabIndex;
@@ -84,6 +85,7 @@ public sealed class MainViewModel : ViewModelBase
         _aiModel = settings.Current.AiModel;
         _applicationAliasesText = FormatAliases(settings.Current.Applications);
         _siteAliasesText = FormatAliases(settings.Current.Sites);
+        _documentAliasesText = FormatAliases(settings.Current.Documents);
         _isVoiceModelInstalled = voiceModelService.IsInstalled;
         _voiceStatusText = voiceModelService.IsInstalled
             ? "Русская модель установлена. Подключаю микрофон…"
@@ -317,6 +319,12 @@ public sealed class MainViewModel : ViewModelBase
         set => SetProperty(ref _siteAliasesText, value);
     }
 
+    public string DocumentAliasesText
+    {
+        get => _documentAliasesText;
+        set => SetProperty(ref _documentAliasesText, value);
+    }
+
     public int SelectedTabIndex
     {
         get => _selectedTabIndex;
@@ -406,16 +414,21 @@ public sealed class MainViewModel : ViewModelBase
             if (SpeakResponses && _speechSynthesizer.IsAvailable)
             {
                 var restartVoice = VoiceActivationEnabled && IsVoiceModelInstalled;
-                if (restartVoice)
+                try
                 {
-                    await _voiceCommandSource.StopAsync();
+                    if (restartVoice)
+                    {
+                        await _voiceCommandSource.PauseAsync();
+                    }
+
+                    await _speechSynthesizer.SpeakAsync(result.Message);
                 }
-
-                await _speechSynthesizer.SpeakAsync(result.Message);
-
-                if (restartVoice)
+                finally
                 {
-                    await _voiceCommandSource.StartAsync();
+                    if (restartVoice)
+                    {
+                        await _voiceCommandSource.ResumeAsync();
+                    }
                 }
             }
         }
@@ -444,7 +457,8 @@ public sealed class MainViewModel : ViewModelBase
         }
 
         if (!TryParseAliases(ApplicationAliasesText, out var applications) ||
-            !TryParseAliases(SiteAliasesText, out var sites))
+            !TryParseAliases(SiteAliasesText, out var sites) ||
+            !TryParseAliases(DocumentAliasesText, out var documents))
         {
             StatusText = "Проверь списки: каждая строка должна иметь формат имя=значение.";
             return;
@@ -465,6 +479,7 @@ public sealed class MainViewModel : ViewModelBase
         _settings.Current.AiModel = AiModel.Trim();
         _settings.Current.Applications = applications;
         _settings.Current.Sites = sites;
+        _settings.Current.Documents = documents;
         await _settings.SaveAsync();
 
         if (VoiceActivationEnabled)
@@ -554,7 +569,7 @@ public sealed class MainViewModel : ViewModelBase
             NeuralVoiceStatusText = $"Проверяю: {_speechSynthesizer.VoiceName}…";
             if (restartVoice)
             {
-                await _voiceCommandSource.StopAsync();
+                await _voiceCommandSource.PauseAsync();
             }
 
             await _speechSynthesizer.SpeakAsync(
@@ -569,7 +584,7 @@ public sealed class MainViewModel : ViewModelBase
         {
             if (restartVoice)
             {
-                await _voiceCommandSource.StartAsync();
+                await _voiceCommandSource.ResumeAsync();
             }
         }
     }

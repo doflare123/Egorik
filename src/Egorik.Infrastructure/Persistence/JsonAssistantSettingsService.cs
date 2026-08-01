@@ -69,6 +69,16 @@ public sealed class JsonAssistantSettingsService(ApplicationDataPaths paths)
             ? "gpt-4o-mini"
             : settings.AiModel.Trim();
 
+        settings.Applications = new Dictionary<string, string>(
+            settings.Applications ?? [],
+            StringComparer.OrdinalIgnoreCase);
+        settings.Sites = new Dictionary<string, string>(
+            settings.Sites ?? [],
+            StringComparer.OrdinalIgnoreCase);
+        settings.Documents = new Dictionary<string, string>(
+            settings.Documents ?? [],
+            StringComparer.OrdinalIgnoreCase);
+
         foreach (var pair in DefaultCatalog.Applications())
         {
             settings.Applications.TryAdd(pair.Key, pair.Value);

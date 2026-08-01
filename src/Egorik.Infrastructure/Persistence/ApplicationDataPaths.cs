@@ -20,4 +20,6 @@ public sealed class ApplicationDataPaths
     public string VoiceLogFile => Path.Combine(RootDirectory, "logs", "voice.log");
 
     public string AiApiKeyFile => Path.Combine(RootDirectory, "ai-api-key.dat");
+
+    public string GeneratedDocumentsDirectory => Path.Combine(RootDirectory, "documents");
 }

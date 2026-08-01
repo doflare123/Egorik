@@ -3,7 +3,8 @@ using Egorik.Core.Platform;
 
 namespace Egorik.Infrastructure.Platform;
 
-public sealed class DesktopApplicationLauncher : IApplicationLauncher
+public sealed class DesktopApplicationLauncher(IInstalledApplicationLocator applicationLocator)
+    : IApplicationLauncher
 {
     public ValueTask<LaunchResult> LaunchAsync(
         string target,
@@ -13,9 +14,10 @@ public sealed class DesktopApplicationLauncher : IApplicationLauncher
 
         try
         {
+            var resolvedTarget = applicationLocator.FindExecutable(target) ?? target;
             Process.Start(new ProcessStartInfo
             {
-                FileName = target,
+                FileName = resolvedTarget,
                 UseShellExecute = true
             });
 

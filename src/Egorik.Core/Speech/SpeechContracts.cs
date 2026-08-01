@@ -61,6 +61,10 @@ public interface IVoiceCommandSource : IAsyncDisposable
 
     ValueTask StartAsync(CancellationToken cancellationToken = default);
 
+    ValueTask PauseAsync(CancellationToken cancellationToken = default);
+
+    ValueTask ResumeAsync(CancellationToken cancellationToken = default);
+
     ValueTask StopAsync(CancellationToken cancellationToken = default);
 }
 

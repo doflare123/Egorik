@@ -22,4 +22,26 @@ public sealed class TextNormalizerTests
 
         Assert.AreEqual("найди егорик", result);
     }
+
+    [TestMethod]
+    [DataRow("музыка", "музыку")]
+    [DataRow("яндекс музыка", "яндекс музыке")]
+    [DataRow("стим", "стиле")]
+    public void KnownEntityMatcher_AcceptsInflectionAndOneRecognitionError(
+        string knownAlias,
+        string spokenValue)
+    {
+        Assert.IsTrue(KnownEntityMatcher.IsMatch(knownAlias, spokenValue));
+    }
+
+    [TestMethod]
+    [DataRow("стим", "стол")]
+    [DataRow("музыка", "музей")]
+    [DataRow("мой браузер", "мой блокнот")]
+    public void KnownEntityMatcher_RejectsUnrelatedValues(
+        string knownAlias,
+        string spokenValue)
+    {
+        Assert.IsFalse(KnownEntityMatcher.IsMatch(knownAlias, spokenValue));
+    }
 }
