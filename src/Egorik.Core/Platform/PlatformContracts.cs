@@ -14,6 +14,21 @@ public interface IInstalledApplicationLocator
     string? FindExecutable(string executableName);
 }
 
+public sealed record DotaHeroPickResult(
+    bool IsSuccess,
+    string Message);
+
+public interface IDotaHeroPicker
+{
+    ValueTask<DotaHeroPickResult> ConfigureAsync(
+        bool enabled,
+        CancellationToken cancellationToken = default);
+
+    ValueTask<DotaHeroPickResult> PickAsync(
+        string heroSearchText,
+        CancellationToken cancellationToken = default);
+}
+
 public interface IWebBrowserService
 {
     ValueTask<LaunchResult> OpenUrlAsync(

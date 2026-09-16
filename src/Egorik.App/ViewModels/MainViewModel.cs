@@ -7,6 +7,7 @@ using Egorik.Core.Commands;
 using Egorik.Core.Configuration;
 using Egorik.Core.Scenarios;
 using Egorik.Core.Speech;
+using Egorik.Core.Plugins;
 
 namespace Egorik.App.ViewModels;
 
@@ -22,6 +23,8 @@ public sealed class MainViewModel : ViewModelBase
     private readonly IAiPlanner _aiPlanner;
     private readonly IAiToolExecutor _aiToolExecutor;
     private readonly IAiApiKeyStore _aiApiKeyStore;
+    private readonly IPluginCatalog _pluginCatalog;
+    private readonly IReadOnlyDictionary<string, IPluginActivationService> _pluginActivations;
     private readonly VoiceWakeIndicator _voiceWakeIndicator = new();
     private string _commandText = string.Empty;
     private string _statusText = "Готов к команде";
@@ -52,6 +55,7 @@ public sealed class MainViewModel : ViewModelBase
     private string _aiApiKey = string.Empty;
     private string _aiStatusText;
     private bool _isWakeAnimationActive;
+    private string _pluginStatusText;
 
     public MainViewModel(
         AssistantEngine engine,
@@ -63,7 +67,9 @@ public sealed class MainViewModel : ViewModelBase
         ISpeechSynthesizer speechSynthesizer,
         IAiPlanner aiPlanner,
         IAiToolExecutor aiToolExecutor,
-        IAiApiKeyStore aiApiKeyStore)
+        IAiApiKeyStore aiApiKeyStore,
+        IPluginCatalog pluginCatalog,
+        IEnumerable<IPluginActivationService> pluginActivations)
     {
         _engine = engine;
         _settings = settings;
@@ -75,6 +81,10 @@ public sealed class MainViewModel : ViewModelBase
         _aiPlanner = aiPlanner;
         _aiToolExecutor = aiToolExecutor;
         _aiApiKeyStore = aiApiKeyStore;
+        _pluginCatalog = pluginCatalog;
+        _pluginActivations = pluginActivations.ToDictionary(
+            activation => activation.PluginId,
+            StringComparer.Ordinal);
 
         _assistantName = settings.Current.AssistantName;
         _searchProvider = settings.Current.SearchProvider;
@@ -86,6 +96,20 @@ public sealed class MainViewModel : ViewModelBase
         _applicationAliasesText = FormatAliases(settings.Current.Applications);
         _siteAliasesText = FormatAliases(settings.Current.Sites);
         _documentAliasesText = FormatAliases(settings.Current.Documents);
+        foreach (var plugin in pluginCatalog.Plugins)
+        {
+            var trusted = !plugin.IsScriptPlugin ||
+                          settings.Current.TrustedPluginFingerprints.TryGetValue(
+                              plugin.Manifest.Id,
+                              out var fingerprint) &&
+                          string.Equals(fingerprint, plugin.Fingerprint, StringComparison.Ordinal);
+            Plugins.Add(new PluginItemViewModel(
+                plugin,
+                settings.Current.EnabledPlugins.Contains(plugin.Manifest.Id) && trusted,
+                trusted));
+        }
+
+        _pluginStatusText = BuildPluginStatusText();
         _isVoiceModelInstalled = voiceModelService.IsInstalled;
         _voiceStatusText = voiceModelService.IsInstalled
             ? "Русская модель установлена. Подключаю микрофон…"
@@ -122,6 +146,8 @@ public sealed class MainViewModel : ViewModelBase
 
     public ObservableCollection<ScenarioItemViewModel> Scenarios { get; } = [];
 
+    public ObservableCollection<PluginItemViewModel> Plugins { get; } = [];
+
     public IReadOnlyList<string> SearchProviders { get; } = ["Yandex", "Google", "DuckDuckGo"];
 
     public AsyncRelayCommand ExecuteCommand { get; }
@@ -143,6 +169,14 @@ public sealed class MainViewModel : ViewModelBase
     public RelayCommand DeleteAiApiKeyCommand { get; }
 
     public RelayCommand UseExampleCommand { get; }
+
+    public string PluginStatusText
+    {
+        get => _pluginStatusText;
+        private set => SetProperty(ref _pluginStatusText, value);
+    }
+
+    public string PluginsDirectory => _pluginCatalog.UserPluginsDirectory;
 
     public string VoiceModelButtonText =>
         IsVoiceModelInstalled ? "Модель установлена" : "Загрузить модель · 45 МБ";
@@ -370,6 +404,8 @@ public sealed class MainViewModel : ViewModelBase
             Scenarios.Add(new ScenarioItemViewModel(scenario));
         }
 
+        await ApplyPluginActivationsAsync();
+
         if (VoiceActivationEnabled && IsVoiceModelInstalled)
         {
             await _voiceCommandSource.StartAsync();
@@ -480,7 +516,27 @@ public sealed class MainViewModel : ViewModelBase
         _settings.Current.Applications = applications;
         _settings.Current.Sites = sites;
         _settings.Current.Documents = documents;
+        foreach (var plugin in Plugins)
+        {
+            if (plugin.IsEnabled)
+            {
+                _settings.Current.EnabledPlugins.Add(plugin.Id);
+                if (plugin.Plugin.IsScriptPlugin)
+                {
+                    _settings.Current.TrustedPluginFingerprints[plugin.Id] =
+                        plugin.Plugin.Fingerprint;
+                    plugin.MarkTrusted();
+                }
+            }
+            else
+            {
+                _settings.Current.EnabledPlugins.Remove(plugin.Id);
+                _settings.Current.TrustedPluginFingerprints.Remove(plugin.Id);
+            }
+        }
         await _settings.SaveAsync();
+
+        var pluginResult = await ApplyPluginActivationsAsync();
 
         if (VoiceActivationEnabled)
         {
@@ -491,9 +547,59 @@ public sealed class MainViewModel : ViewModelBase
             await _voiceCommandSource.StopAsync();
         }
 
-        StatusText = "Настройки сохранены.";
+        StatusText = pluginResult is null || pluginResult.IsSuccess
+            ? "Настройки сохранены."
+            : pluginResult.Message;
         AiStatusText = BuildAiStatusText();
         RaisePropertyChanged(nameof(Greeting));
+    }
+
+    private async Task<CommandResult?> ApplyPluginActivationsAsync()
+    {
+        CommandResult? firstFailure = null;
+        var messages = new List<string>();
+        foreach (var activation in _pluginActivations.Values)
+        {
+            var available = _pluginCatalog.Plugins.Any(plugin =>
+                string.Equals(plugin.Manifest.Id, activation.PluginId, StringComparison.Ordinal));
+            var package = _pluginCatalog.Plugins.FirstOrDefault(plugin =>
+                string.Equals(plugin.Manifest.Id, activation.PluginId, StringComparison.Ordinal));
+            var trusted = package is not { IsScriptPlugin: true } ||
+                          _settings.Current.TrustedPluginFingerprints.TryGetValue(
+                              activation.PluginId,
+                              out var fingerprint) &&
+                          string.Equals(fingerprint, package.Fingerprint, StringComparison.Ordinal);
+            var enabled = available && trusted &&
+                          _settings.Current.EnabledPlugins.Contains(activation.PluginId);
+            var result = await activation.ApplyAsync(enabled);
+            messages.Add(result.Message);
+            if (!result.IsSuccess)
+            {
+                firstFailure ??= result;
+            }
+        }
+
+        PluginStatusText = BuildPluginStatusText(messages);
+        return firstFailure;
+    }
+
+    private string BuildPluginStatusText(IReadOnlyList<string>? activationMessages = null)
+    {
+        var loaded = _pluginCatalog.Plugins.Count;
+        var summary = loaded == 0
+            ? "Плагины не найдены."
+            : $"Загружено плагинов: {loaded}.";
+        if (_pluginCatalog.Issues.Count > 0)
+        {
+            summary += $" Отклонено: {_pluginCatalog.Issues.Count}.";
+        }
+
+        if (activationMessages is { Count: > 0 })
+        {
+            summary += " " + string.Join(" ", activationMessages);
+        }
+
+        return summary;
     }
 
     private async Task DownloadVoiceModelAsync()

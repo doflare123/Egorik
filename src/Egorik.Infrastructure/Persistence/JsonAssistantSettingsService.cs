@@ -78,6 +78,12 @@ public sealed class JsonAssistantSettingsService(ApplicationDataPaths paths)
         settings.Documents = new Dictionary<string, string>(
             settings.Documents ?? [],
             StringComparer.OrdinalIgnoreCase);
+        settings.EnabledPlugins = new HashSet<string>(
+            settings.EnabledPlugins ?? [],
+            StringComparer.Ordinal);
+        settings.TrustedPluginFingerprints = new Dictionary<string, string>(
+            settings.TrustedPluginFingerprints ?? [],
+            StringComparer.Ordinal);
 
         foreach (var pair in DefaultCatalog.Applications())
         {

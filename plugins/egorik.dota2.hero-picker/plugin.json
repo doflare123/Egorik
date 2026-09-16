@@ -1,0 +1,14 @@
+{
+  "id": "egorik.dota2.hero-picker",
+  "name": "Пик героя Dota 2",
+  "version": "1.0.0",
+  "apiVersion": "1",
+  "kind": "javascript",
+  "entryPoint": "plugin.js",
+  "dataFiles": [
+    "heroes.json"
+  ],
+  "permissions": [
+    "dota2.hero_pick"
+  ]
+}

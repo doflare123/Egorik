@@ -27,6 +27,12 @@ public sealed class AssistantSettings
 
     public Dictionary<string, string> Documents { get; set; } =
         new(StringComparer.OrdinalIgnoreCase);
+
+    public HashSet<string> EnabledPlugins { get; set; } =
+        new(StringComparer.Ordinal);
+
+    public Dictionary<string, string> TrustedPluginFingerprints { get; set; } =
+        new(StringComparer.Ordinal);
 }
 
 public interface IAssistantSettingsService

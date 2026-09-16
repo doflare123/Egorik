@@ -394,6 +394,47 @@
                 </StackPanel>
               </Border>
 
+              <Border Classes="card">
+                <StackPanel Spacing="10">
+                  <TextBlock Classes="h2" Text="Плагины" />
+                  <ItemsControl ItemsSource="{Binding Plugins}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Border Classes="card" Margin="0,2">
+                          <StackPanel Spacing="5">
+                            <CheckBox
+                                Content="{Binding Name}"
+                                IsChecked="{Binding IsEnabled}" />
+                            <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap">
+                              <Run Text="{Binding KindText}" /><Run Text=" · v" /><Run Text="{Binding Version}" />
+                            </TextBlock>
+                            <TextBlock Classes="muted" FontSize="11"
+                                       Text="{Binding PermissionsText}" TextWrapping="Wrap" />
+                            <TextBlock Classes="muted" FontSize="11"
+                                       Text="{Binding TrustText}" TextWrapping="Wrap" />
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock
+                      Classes="muted"
+                      FontSize="11"
+                      Text="Каталог пользовательских плагинов:"
+                      TextWrapping="Wrap" />
+                  <TextBlock
+                      Classes="muted"
+                      FontSize="11"
+                      Text="{Binding PluginsDirectory}"
+                      TextWrapping="Wrap" />
+                  <TextBlock
+                      Classes="muted"
+                      FontSize="11"
+                      Text="{Binding PluginStatusText}"
+                      TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+
               <Button
                   HorizontalAlignment="Right"
                   Classes="primary"

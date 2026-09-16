@@ -5,6 +5,7 @@ using Egorik.Core.Applications;
 using Egorik.Core.Commands;
 using Egorik.Core.Configuration;
 using Egorik.Core.Platform;
+using Egorik.Core.Plugins;
 using Egorik.Core.Scenarios;
 using Egorik.Core.Speech;
 using Egorik.Infrastructure.Ai;
@@ -12,6 +13,7 @@ using Egorik.Infrastructure.Applications;
 using Egorik.Infrastructure.Commands;
 using Egorik.Infrastructure.Persistence;
 using Egorik.Infrastructure.Platform;
+using Egorik.Infrastructure.Plugins;
 using Egorik.Infrastructure.Speech;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -30,6 +32,7 @@ internal static class Bootstrapper
         });
         services.AddSingleton<IAssistantSettingsService, JsonAssistantSettingsService>();
         services.AddSingleton<IScenarioRepository, JsonScenarioRepository>();
+        services.AddSingleton<IPluginCatalog, JsonPluginCatalog>();
 
         services.AddSingleton<IInstalledApplicationLocator, DesktopInstalledApplicationLocator>();
         services.AddSingleton<IApplicationLauncher, DesktopApplicationLauncher>();
@@ -37,6 +40,13 @@ internal static class Bootstrapper
         services.AddSingleton<IMediaControlService, DesktopMediaControlService>();
         services.AddSingleton<IYandexMusicController, DesktopYandexMusicController>();
         services.AddSingleton<IOfficeDocumentService, OpenXmlOfficeDocumentService>();
+        services.AddSingleton<DesktopDotaHeroPicker>();
+        services.AddSingleton<IDotaHeroPicker>(services =>
+            services.GetRequiredService<DesktopDotaHeroPicker>());
+        services.AddSingleton<IPluginCapabilityHandler>(services =>
+            services.GetRequiredService<DesktopDotaHeroPicker>());
+        services.AddSingleton<IPluginActivationService>(services =>
+            services.GetRequiredService<DesktopDotaHeroPicker>());
         services.AddSingleton<ISteamGameCatalog, SteamGameCatalog>();
         services.AddSingleton<IApplicationIntegration, DefaultBrowserApplicationIntegration>();
         services.AddSingleton<IApplicationIntegration, SteamApplicationIntegration>();
@@ -74,6 +84,8 @@ internal static class Bootstrapper
         services.AddSingleton<IAssistantCommand, CalculatorCommand>();
         services.AddSingleton<IAssistantCommand, DateTimeCommand>();
         services.AddSingleton<IAssistantCommand, MediaCommand>();
+        services.AddSingleton<IAssistantCommand, DeclarativePluginCommand>();
+        services.AddSingleton<IAssistantCommand, JavaScriptPluginCommand>();
 
         services.AddSingleton<ICommandRouter, CommandRouter>();
         services.AddSingleton<AssistantEngine>();

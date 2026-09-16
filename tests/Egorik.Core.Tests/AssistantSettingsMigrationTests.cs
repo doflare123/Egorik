@@ -30,6 +30,8 @@ public sealed class AssistantSettingsMigrationTests
             Assert.AreEqual("demo.exe", service.Current.Applications["моё приложение"]);
             Assert.AreEqual("https://example.com", service.Current.Sites["мой сайт"]);
             Assert.IsEmpty(service.Current.Documents);
+            Assert.IsEmpty(service.Current.EnabledPlugins);
+            Assert.IsEmpty(service.Current.TrustedPluginFingerprints);
         }
         finally
         {

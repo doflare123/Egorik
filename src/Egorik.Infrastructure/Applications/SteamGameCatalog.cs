@@ -85,7 +85,7 @@ public sealed class SteamGameCatalog : ISteamGameCatalog
     }
 
     [SupportedOSPlatform("windows")]
-    private static IReadOnlyList<string> FindLibraries()
+    internal static IReadOnlyList<string> FindLibraries()
     {
         var libraries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var programFilesX86 = Environment.GetFolderPath(

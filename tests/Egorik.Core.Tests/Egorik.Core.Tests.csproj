@@ -14,4 +14,10 @@
     <ProjectReference Include="../../src/Egorik.Core/Egorik.Core.csproj" />
     <ProjectReference Include="../../src/Egorik.Infrastructure/Egorik.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="../../plugins/**/*">
+      <Link>plugins/%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

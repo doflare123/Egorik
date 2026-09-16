@@ -9,6 +9,7 @@
     <ProjectReference Include="../Egorik.Core/Egorik.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Jint" />
     <PackageReference Include="NAudio" />
     <PackageReference Include="org.k2fsa.sherpa.onnx" />
     <PackageReference Include="SharpCompress" />

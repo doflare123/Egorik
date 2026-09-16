@@ -22,4 +22,6 @@ public sealed class ApplicationDataPaths
     public string AiApiKeyFile => Path.Combine(RootDirectory, "ai-api-key.dat");
 
     public string GeneratedDocumentsDirectory => Path.Combine(RootDirectory, "documents");
+
+    public string PluginsDirectory => Path.Combine(RootDirectory, "plugins");
 }
