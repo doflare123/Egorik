@@ -8,7 +8,13 @@ public sealed class AssistantSettings
 
     public bool SpeakResponses { get; set; } = true;
 
+    public bool DetailedFailureInformation { get; set; }
+
+    public bool StartWithSystem { get; set; }
+
     public bool VoiceActivationEnabled { get; set; }
+
+    public string AudioInputDeviceId { get; set; } = string.Empty;
 
     public string SearchProvider { get; set; } = "Yandex";
 
@@ -18,6 +24,8 @@ public sealed class AssistantSettings
         "https://api.openai.com/v1/chat/completions";
 
     public string AiModel { get; set; } = "gpt-4o-mini";
+
+    public string DefaultWeatherCity { get; set; } = "Калининград";
 
     public Dictionary<string, string> Applications { get; set; } =
         new(StringComparer.OrdinalIgnoreCase);

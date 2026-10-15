@@ -245,9 +245,37 @@
                   <CheckBox
                       Content="Озвучивать ответы"
                       IsChecked="{Binding SpeakResponses}" />
+                  <CheckBox Content="Подробная информация о неудаче"
+                            IsChecked="{Binding DetailedFailureInformation}" />
+                  <TextBlock Classes="muted" Text="Зачитывать подробности ошибок. Краткий ответ используется по умолчанию."
+                             TextWrapping="Wrap" />
+                  <CheckBox Content="Запускать вместе с Windows в tray"
+                            IsEnabled="{Binding IsSystemStartupSupported}"
+                            IsChecked="{Binding StartWithSystem}" />
+                  <TextBlock Classes="muted" Text="Скажи «отбой» для паузы на 10 секунд. Посреди разговора: «слушай, Егорик»."
+                             TextWrapping="Wrap" />
                   <CheckBox
                       Content="Голосовая активация"
                       IsChecked="{Binding VoiceActivationEnabled}" />
+                  <TextBlock Classes="muted" Text="Микрофон" />
+                  <ComboBox
+                      HorizontalAlignment="Stretch"
+                      IsEnabled="{Binding !AudioInputSettings.IsRefreshing}"
+                      ItemsSource="{Binding AudioInputSettings.Devices}"
+                      SelectedItem="{Binding AudioInputSettings.SelectedDevice}">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                  <Button
+                      HorizontalAlignment="Left"
+                      Classes="secondary"
+                      Command="{Binding AudioInputSettings.RefreshCommand}"
+                      Content="Обновить микрофоны" />
+                  <TextBlock Classes="muted" FontSize="11"
+                             Text="{Binding AudioInputSettings.StatusText}" TextWrapping="Wrap" />
                   <TextBlock
                       Classes="muted"
                       FontSize="11"
@@ -300,7 +328,7 @@
                 <StackPanel Spacing="10">
                   <TextBlock Classes="h2" Text="ИИ-планировщик" />
                   <CheckBox
-                      Content="Использовать ИИ для неизвестных команд"
+                      Content="Использовать ИИ для вопросов и команд"
                       IsChecked="{Binding AiEnabled}" />
                   <TextBlock Classes="muted" FontSize="11" Text="OpenAI-compatible endpoint" />
                   <TextBox
@@ -315,6 +343,8 @@
                       PasswordChar="●"
                       Text="{Binding AiApiKey}"
                       PlaceholderText="{Binding AiApiKeyWatermark}" />
+                  <TextBlock Classes="muted" FontSize="11" Text="Город для погоды по умолчанию" />
+                  <TextBox Text="{Binding DefaultWeatherCity}" PlaceholderText="Калининград" />
                   <TextBlock
                       Classes="muted"
                       FontSize="11"
@@ -442,6 +472,29 @@
                   Content="Сохранить настройки" />
             </StackPanel>
           </Grid>
+        </ScrollViewer>
+      </TabItem>
+      <TabItem Header="Справочник">
+        <ScrollViewer>
+          <StackPanel Margin="6,22" Spacing="14">
+            <TextBlock Classes="h1" Text="Доступные команды" />
+            <TextBlock Classes="muted" Text="Встроенные команды и команды установленных плагинов. Изменения доступности применяются после сохранения настроек."
+                       TextWrapping="Wrap" />
+            <ItemsControl ItemsSource="{Binding CommandCatalog}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Classes="card" Margin="0,0,0,10">
+                    <StackPanel Spacing="6">
+                      <TextBlock Classes="h2" Text="{Binding Title}" TextWrapping="Wrap" />
+                      <TextBlock Classes="muted" Text="{Binding Source}" TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding Description}" TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding Examples}" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
         </ScrollViewer>
       </TabItem>
     </TabControl>

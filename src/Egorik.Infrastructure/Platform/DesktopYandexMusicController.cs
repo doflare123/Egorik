@@ -6,9 +6,13 @@ using Windows.Media.Control;
 namespace Egorik.Infrastructure.Platform;
 
 public sealed class DesktopYandexMusicController(
-    IInstalledApplicationLocator applicationLocator) : IYandexMusicController
+    IInstalledApplicationLocator applicationLocator,
+    IYandexMusicVolumeService volumeService) : IYandexMusicController
 {
     public const string ExecutableName = "Яндекс Музыка.exe";
+
+    public ValueTask<LaunchResult> SetVolumeAsync(int percent, CancellationToken cancellationToken = default) =>
+        volumeService.SetAsync(percent, cancellationToken);
 
     public ValueTask<LaunchResult> OpenAsync(
         CancellationToken cancellationToken = default) =>
@@ -39,6 +43,12 @@ public sealed class DesktopYandexMusicController(
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (action is YandexMusicAction.VolumeUp or YandexMusicAction.VolumeDown or
+            YandexMusicAction.Mute or YandexMusicAction.Unmute)
+        {
+            return await volumeService.AdjustAsync(action, cancellationToken);
+        }
+
         if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 17763))
         {
             return new LaunchResult(

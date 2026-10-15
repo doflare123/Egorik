@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Egorik.Core.Configuration;
 using Egorik.Core.Speech;
@@ -10,10 +11,14 @@ namespace Egorik.Infrastructure.Speech;
 public sealed class VoskVoiceCommandSource(
     IVoiceModelService modelService,
     IAssistantSettingsService settings,
+    IWaveInputDeviceCatalog inputDevices,
     ApplicationDataPaths paths) : IVoiceCommandSource, IDisposable
 {
     private static readonly TimeSpan CommandWindow = TimeSpan.FromSeconds(8);
     private readonly Lock _syncRoot = new();
+    private readonly SpeechPhraseBuffer _phraseBuffer = new();
+    private readonly VoiceSuppression _suppression = new();
+    private readonly RecognitionStreamBudget _streamBudget = new();
     private WaveInEvent? _waveInput;
     private Model? _model;
     private VoskRecognizer? _recognizer;
@@ -24,6 +29,8 @@ public sealed class VoskVoiceCommandSource(
     private int _armVersion;
     private bool _hasReceivedAudio;
     private bool _disposed;
+    private string _activeDeviceId = string.Empty;
+    private string _activeDeviceName = string.Empty;
 
     public bool IsAvailable => OperatingSystem.IsWindows() && modelService.IsInstalled;
 
@@ -38,7 +45,10 @@ public sealed class VoskVoiceCommandSource(
 
     public event EventHandler<VoiceInputActivityEventArgs>? ActivityChanged;
 
-    public ValueTask StartAsync(CancellationToken cancellationToken = default)
+    public async ValueTask StartAsync(CancellationToken cancellationToken = default) =>
+        await Task.Run(() => StartCore(cancellationToken), cancellationToken);
+
+    private void StartCore(CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         cancellationToken.ThrowIfCancellationRequested();
@@ -46,30 +56,33 @@ public sealed class VoskVoiceCommandSource(
         if (!OperatingSystem.IsWindows())
         {
             SetState(VoiceInputState.Error, "Голосовой ввод пока реализован только для Windows.");
-            return ValueTask.CompletedTask;
+            return;
         }
 
         if (!modelService.IsInstalled)
         {
             SetState(VoiceInputState.ModelMissing, "Сначала загрузи русскую голосовую модель.");
-            return ValueTask.CompletedTask;
+            return;
         }
 
         lock (_syncRoot)
         {
-            if (_waveInput is not null)
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            var requestedDeviceId = settings.Current.AudioInputDeviceId;
+            if (_waveInput is not null && State != VoiceInputState.Error &&
+                string.Equals(_activeDeviceId, requestedDeviceId, StringComparison.OrdinalIgnoreCase))
             {
-                return ValueTask.CompletedTask;
+                return;
             }
+
+            ++_startVersion;
+            Disarm();
+            DisposeWaveInput();
 
             SetState(VoiceInputState.Starting, "Подключаю микрофон и проверяю аудиопоток…");
             try
             {
-                if (WaveInEvent.DeviceCount == 0)
-                {
-                    throw new InvalidOperationException(
-                        "Windows не обнаружила ни одного устройства записи.");
-                }
+                var selectedDevice = WaveInputDeviceSelector.Select(requestedDeviceId, inputDevices.GetWaveDevices(cancellationToken));
 
                 Vosk.Vosk.SetLogLevel(-1);
                 if (_model is null)
@@ -81,6 +94,7 @@ public sealed class VoskVoiceCommandSource(
                 {
                     _recognizer = new VoskRecognizer(_model, 16000);
                     _recognizer.SetWords(false);
+                    _streamBudget.Reset();
                 }
                 else
                 {
@@ -88,13 +102,17 @@ public sealed class VoskVoiceCommandSource(
                 }
 
                 _hasReceivedAudio = false;
+                _phraseBuffer.Reset();
                 _lastPartialText = string.Empty;
                 _lastActivityPublishedAt = DateTimeOffset.MinValue;
                 var startVersion = ++_startVersion;
+                cancellationToken.ThrowIfCancellationRequested();
+                _activeDeviceId = selectedDevice.Id;
+                _activeDeviceName = selectedDevice.Name;
 
                 _waveInput = new WaveInEvent
                 {
-                    DeviceNumber = 0,
+                    DeviceNumber = selectedDevice.DeviceNumber,
                     WaveFormat = new WaveFormat(16000, 16, 1),
                     BufferMilliseconds = 80,
                     NumberOfBuffers = 4
@@ -103,9 +121,14 @@ public sealed class VoskVoiceCommandSource(
                 _waveInput.RecordingStopped += OnRecordingStopped;
                 _waveInput.StartRecording();
 
-                var deviceName = WaveInEvent.GetCapabilities(0).ProductName;
-                WriteDiagnostic($"Микрофон открыт: {deviceName}.");
+                WriteDiagnostic($"Микрофон открыт: {_activeDeviceName}.");
                 _ = WatchAudioInputAsync(startVersion);
+            }
+            catch (OperationCanceledException)
+            {
+                DisposeRecognitionObjects();
+                SetState(VoiceInputState.Disabled, "Подключение микрофона отменено.");
+                throw;
             }
             catch (Exception exception)
             {
@@ -114,8 +137,6 @@ public sealed class VoskVoiceCommandSource(
                 WriteDiagnostic($"Ошибка запуска микрофона: {exception}");
             }
         }
-
-        return ValueTask.CompletedTask;
     }
 
     public ValueTask PauseAsync(CancellationToken cancellationToken = default)
@@ -127,6 +148,7 @@ public sealed class VoskVoiceCommandSource(
         {
             ++_startVersion;
             ++_armVersion;
+            _phraseBuffer.Reset();
             DisposeWaveInput();
         }
 
@@ -150,7 +172,7 @@ public sealed class VoskVoiceCommandSource(
         {
             ++_startVersion;
             ++_armVersion;
-
+            _phraseBuffer.Reset();
             DisposeRecognitionObjects();
         }
 
@@ -187,14 +209,15 @@ public sealed class VoskVoiceCommandSource(
 
     private void OnDataAvailable(object? sender, WaveInEventArgs eventArgs)
     {
-        string? finalText = null;
+        string? phrase = null;
         string partialText = string.Empty;
         var becameReady = false;
+        var abandonedPhrase = false;
         var level = CalculateLevel(eventArgs.Buffer, eventArgs.BytesRecorded);
 
         lock (_syncRoot)
         {
-            if (_recognizer is null)
+            if (_recognizer is null || !ReferenceEquals(sender, _waveInput))
             {
                 return;
             }
@@ -208,14 +231,75 @@ public sealed class VoskVoiceCommandSource(
                     WriteDiagnostic("Получен первый аудиобуфер; захват микрофона работает.");
                 }
 
-                if (_recognizer.AcceptWaveform(eventArgs.Buffer, eventArgs.BytesRecorded))
+                if (_suppression.IsSuppressed(Stopwatch.GetElapsedTime(0)))
                 {
-                    finalText = ReadText(_recognizer.Result(), "text");
+                    if (State != VoiceInputState.Suppressed)
+                    {
+                        SetState(VoiceInputState.Suppressed, "Отбой. Ожидаю окончания паузы.");
+                    }
+
+                    return;
+                }
+
+                if (State == VoiceInputState.Suppressed)
+                {
+                    SetWaitingState();
+                }
+
+                var phraseFinalized = _recognizer.AcceptWaveform(eventArgs.Buffer, eventArgs.BytesRecorded);
+                var recognizedText = phraseFinalized
+                    ? ReadText(_recognizer.Result(), "text") ?? string.Empty
+                    : ReadText(_recognizer.PartialResult(), "partial") ?? string.Empty;
+                if (_suppression.Observe(recognizedText, Stopwatch.GetElapsedTime(0)))
+                {
+                    Disarm();
+                    _phraseBuffer.Reset();
+                    _recognizer.Reset();
+                    SetState(VoiceInputState.Suppressed, "Отбой. Не реагирую на обращения 10 секунд.");
+                    ActivityChanged?.Invoke(this, new VoiceInputActivityEventArgs(0, string.Empty));
+                    return;
+                }
+
+                if (phraseFinalized)
+                {
+                    var finalText = recognizedText;
+                    if (_phraseBuffer.HasFinalizedText &&
+                        WakePhraseParser.Parse(finalText, settings.Current.AssistantName).Kind != WakePhraseKind.NotAddressed)
+                    {
+                        // A fresh address starts a phrase instead of attaching it to background speech.
+                        _phraseBuffer.Reset();
+                    }
+
+                    _phraseBuffer.AddFinal(
+                        finalText,
+                        Stopwatch.GetElapsedTime(0));
                     _lastPartialText = string.Empty;
                 }
                 else
                 {
-                    partialText = ReadText(_recognizer.PartialResult(), "partial") ?? string.Empty;
+                    partialText = recognizedText;
+                    _phraseBuffer.UpdatePartial(partialText, Stopwatch.GetElapsedTime(0));
+                }
+
+                partialText = _phraseBuffer.PreviewText;
+                phrase = _phraseBuffer.TakeReadyPhrase(Stopwatch.GetElapsedTime(0));
+                var reset = _streamBudget.Advance(eventArgs.BytesRecorded, phraseFinalized);
+                if (reset != RecognitionStreamReset.None)
+                {
+                    // Reuse the loaded model, but release all native decoder/frontend history.
+                    // Reset() alone keeps that history in Vosk.
+                    _recognizer.Dispose();
+                    _recognizer = null;
+                    _recognizer = new VoskRecognizer(_model!, 16000);
+                    _recognizer.SetWords(false);
+                    if (reset == RecognitionStreamReset.AbandonOverlongPhrase)
+                    {
+                        abandonedPhrase = partialText.Length > 0 || State == VoiceInputState.ListeningForCommand;
+                        _phraseBuffer.Reset();
+                        Disarm();
+                        partialText = string.Empty;
+                        phrase = null;
+                    }
                 }
             }
             catch (Exception exception)
@@ -230,16 +314,26 @@ public sealed class VoskVoiceCommandSource(
             SetWaitingState();
         }
 
+        if (abandonedPhrase)
+        {
+            SetWaitingState("Слишком длинный непрерывный звук. Позови меня ещё раз.");
+        }
+
         PublishActivity(level, partialText);
 
-        if (!string.IsNullOrWhiteSpace(finalText))
+        if (!string.IsNullOrWhiteSpace(phrase))
         {
-            HandleRecognizedText(finalText);
+            HandleRecognizedText(phrase);
         }
     }
 
     private void HandleRecognizedText(string text)
     {
+        if (_suppression.IsSuppressed(Stopwatch.GetElapsedTime(0)))
+        {
+            return;
+        }
+
         var match = WakePhraseParser.Parse(text, settings.Current.AssistantName);
         var normalized = match.RecognizedText;
         if (normalized.Length == 0)
@@ -362,6 +456,11 @@ public sealed class VoskVoiceCommandSource(
 
     private void OnRecordingStopped(object? sender, StoppedEventArgs eventArgs)
     {
+        if (!ReferenceEquals(sender, _waveInput))
+        {
+            return;
+        }
+
         if (eventArgs.Exception is not null)
         {
             SetState(VoiceInputState.Error, $"Микрофон остановлен: {eventArgs.Exception.Message}");
@@ -371,7 +470,7 @@ public sealed class VoskVoiceCommandSource(
 
     private void SetWaitingState(string? prefix = null)
     {
-        var waiting = $"Жду обращения «{settings.Current.AssistantName}».";
+        var waiting = $"Микрофон: {_activeDeviceName}. Жду обращения «{settings.Current.AssistantName}».";
         SetState(
             VoiceInputState.WaitingForWakeWord,
             string.IsNullOrWhiteSpace(prefix) ? waiting : $"{prefix} {waiting}");
@@ -444,6 +543,8 @@ public sealed class VoskVoiceCommandSource(
                 _recognizer = null;
                 _model = null;
                 _hasReceivedAudio = false;
+                _phraseBuffer.Reset();
+                _streamBudget.Reset();
             }
         }
     }

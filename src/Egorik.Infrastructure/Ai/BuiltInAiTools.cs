@@ -132,7 +132,8 @@ public sealed class MediaControlAiTool(IMediaControlService mediaControl) : IAiT
 
     public AiToolDescriptor Descriptor { get; } = new(
         "media_control",
-        "Управляет текущим медиаплеером: пауза, продолжение, треки и системная громкость.",
+        "Управляет текущим медиаплеером и общей громкостью колонок. " +
+        "Для громкости музыки или Яндекс Музыки используй application_action с yandex_music.volume_up, volume_down или set_volume; этот инструмент меняет все колонки.",
         [
             new AiToolParameterDescriptor(
                 "action",

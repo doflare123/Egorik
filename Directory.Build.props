@@ -6,5 +6,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <InvariantGlobalization>false</InvariantGlobalization>
+    <Version>0.1.0</Version>
   </PropertyGroup>
 </Project>

@@ -13,6 +13,103 @@ namespace Egorik.Core.Tests;
 public sealed class ApplicationAutomationTests
 {
     [TestMethod]
+    [DataRow("сделай музыку тише", "volume_down", YandexMusicAction.VolumeDown)]
+    [DataRow("сделай яндекс музыку громче", "volume_up", YandexMusicAction.VolumeUp)]
+    [DataRow("убавь громкость яндекс музыки", "volume_down", YandexMusicAction.VolumeDown)]
+    [DataRow("сделай тише в яндекс музыке", "volume_down", YandexMusicAction.VolumeDown)]
+    [DataRow("выключи звук в яндекс музыке", "mute", YandexMusicAction.Mute)]
+    public async Task MusicVolumeUsesAddressedControllerInsteadOfGlobalMedia(string phrase, string action, YandexMusicAction expected)
+    {
+        var controller = new RecordingYandexMusicController();
+        var registry = new ApplicationActionRegistry([new YandexMusicApplicationIntegration(controller)]);
+        var global = new RecordingMediaControl();
+        var router = new CommandRouter([new ApplicationActionCommand(registry, new FakeSettingsService()), new MediaCommand(global)]);
+
+        var result = await router.RouteAsync(new CommandContext(phrase, phrase));
+
+        Assert.IsTrue(result!.IsSuccess);
+        CollectionAssert.AreEqual(new[] { expected }, controller.Actions.ToArray());
+        Assert.AreEqual(0, global.Calls);
+        Assert.IsTrue(registry.AvailableApplications[0].Actions.Any(candidate => candidate.Id == action));
+    }
+
+    [TestMethod]
+    public async Task MusicVolumeSupportsPercentagesFromLocalCommandAndValidatedAiPlan()
+    {
+        var controller = new RecordingYandexMusicController();
+        var registry = new ApplicationActionRegistry([new YandexMusicApplicationIntegration(controller)]);
+        var command = new ApplicationActionCommand(registry, new FakeSettingsService());
+        var text = TextNormalizer.Normalize("громкость яндекс музыки на 50%");
+        var match = await command.MatchAsync(text);
+        Assert.IsNotNull(match);
+        Assert.IsTrue((await command.ExecuteAsync(new CommandContext(text, text), match)).IsSuccess);
+        Assert.AreEqual(50, controller.VolumePercent);
+
+        var executor = new AiToolExecutor([new ApplicationActionAiTool(registry)]);
+        var result = await executor.ExecuteAsync(new AiPlan([new PlannedToolCall("application_action",
+            new Dictionary<string, string> { ["operation"] = "yandex_music.set_volume", ["input"] = "25" })]));
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.AreEqual(25, controller.VolumePercent);
+        Assert.AreEqual(0, controller.Actions.Count);
+    }
+
+    [TestMethod]
+    [DataRow("101")]
+    [DataRow("-1")]
+    [DataRow("50.5")]
+    [DataRow("shell")]
+    public async Task MusicVolumeRejectsDisallowedAiValuesBeforeController(string value)
+    {
+        var controller = new RecordingYandexMusicController();
+        var registry = new ApplicationActionRegistry([new YandexMusicApplicationIntegration(controller)]);
+        var executor = new AiToolExecutor([new ApplicationActionAiTool(registry)]);
+
+        var result = await executor.ExecuteAsync(new AiPlan([new PlannedToolCall("application_action",
+            new Dictionary<string, string> { ["operation"] = "yandex_music.set_volume", ["input"] = value })]));
+
+        Assert.IsFalse(result.IsSuccess);
+        Assert.IsNull(controller.VolumePercent);
+    }
+
+    [TestMethod]
+    public async Task MusicVolumeIntegrationRejectsExtraArgumentsWhenCalledDirectly()
+    {
+        var controller = new RecordingYandexMusicController();
+        var integration = new YandexMusicApplicationIntegration(controller);
+
+        Assert.IsFalse((await integration.ExecuteAsync(new ApplicationActionRequest("yandex_music", "set_volume",
+            new Dictionary<string, string> { ["percent"] = "50", ["extra"] = "bad" }))).IsSuccess);
+        Assert.IsFalse((await integration.ExecuteAsync(new ApplicationActionRequest("yandex_music", "volume_up",
+            new Dictionary<string, string> { ["percent"] = "50" }))).IsSuccess);
+        Assert.IsNull(controller.VolumePercent);
+        Assert.IsEmpty(controller.Actions);
+    }
+
+    [TestMethod]
+    [DataRow("сделай плеер тише")]
+    [DataRow("не сделай музыку громче")]
+    [DataRow("сделай музыку громче и выключи компьютер")]
+    [DataRow("громкость яндекс музыки на 101 процентов")]
+    public async Task MusicVolumeRejectsOtherTargetsNegationsAndCompoundRequests(string phrase)
+    {
+        var controller = new RecordingYandexMusicController();
+        var command = new ApplicationActionCommand(new ApplicationActionRegistry([new YandexMusicApplicationIntegration(controller)]), new FakeSettingsService());
+
+        Assert.IsNull(await command.MatchAsync(phrase));
+        Assert.IsEmpty(controller.Actions);
+    }
+
+    private sealed class RecordingMediaControl : IMediaControlService
+    {
+        public int Calls { get; private set; }
+        public ValueTask<LaunchResult> ExecuteAsync(MediaAction action, CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            return ValueTask.FromResult(new LaunchResult(true, "Готово"));
+        }
+    }
+    [TestMethod]
     public void Registry_RejectsActionAboveAllowedRisk()
     {
         var integration = new RecordingIntegration(
@@ -379,6 +476,14 @@ public sealed class ApplicationAutomationTests
 
     private sealed class RecordingYandexMusicController : IYandexMusicController
     {
+        public int? VolumePercent { get; private set; }
+
+        public ValueTask<LaunchResult> SetVolumeAsync(int percent, CancellationToken cancellationToken = default)
+        {
+            VolumePercent = percent;
+            return Success();
+        }
+
         public int OpenCount { get; private set; }
 
         public int MyWaveCount { get; private set; }

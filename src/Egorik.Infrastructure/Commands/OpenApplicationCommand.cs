@@ -23,10 +23,7 @@ public sealed class OpenApplicationCommand(
             return ValueTask.FromResult<CommandMatch?>(null);
         }
 
-        var application = settings.Current.Applications.Keys
-            .OrderByDescending(alias => alias.Length)
-            .FirstOrDefault(alias =>
-                KnownEntityMatcher.IsMatch(alias, target));
+        var application = KnownEntityMatcher.FindUniqueMatch(settings.Current.Applications.Keys, target);
 
         return ValueTask.FromResult(application is null
             ? null

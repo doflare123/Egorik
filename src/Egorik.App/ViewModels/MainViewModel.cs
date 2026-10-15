@@ -8,10 +8,11 @@ using Egorik.Core.Configuration;
 using Egorik.Core.Scenarios;
 using Egorik.Core.Speech;
 using Egorik.Core.Plugins;
+using Egorik.Core.Platform;
 
 namespace Egorik.App.ViewModels;
 
-public sealed class MainViewModel : ViewModelBase
+public sealed class MainViewModel : ViewModelBase, IDisposable
 {
     private readonly AssistantEngine _engine;
     private readonly IAssistantSettingsService _settings;
@@ -26,6 +27,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly IPluginCatalog _pluginCatalog;
     private readonly IReadOnlyDictionary<string, IPluginActivationService> _pluginActivations;
     private readonly VoiceWakeIndicator _voiceWakeIndicator = new();
+    private readonly VoiceActivityDispatcher _voiceActivityDispatcher;
     private string _commandText = string.Empty;
     private string _statusText = "Готов к команде";
     private string _assistantName;
@@ -34,9 +36,14 @@ public sealed class MainViewModel : ViewModelBase
     private string _siteAliasesText;
     private string _documentAliasesText;
     private bool _speakResponses;
+    private bool _detailedFailureInformation;
+    private bool _startWithSystem;
+    private readonly ISystemStartupService _systemStartup;
     private bool _voiceActivationEnabled;
     private int _selectedTabIndex;
     private bool _isBusy;
+    private CancellationTokenSource? _executionCancellation;
+    private int _voiceSuppressionVersion;
     private string _scenarioName = string.Empty;
     private string _scenarioTrigger = string.Empty;
     private string _scenarioCommandsText = string.Empty;
@@ -52,6 +59,7 @@ public sealed class MainViewModel : ViewModelBase
     private bool _aiEnabled;
     private string _aiEndpoint;
     private string _aiModel;
+    private string _defaultWeatherCity;
     private string _aiApiKey = string.Empty;
     private string _aiStatusText;
     private bool _isWakeAnimationActive;
@@ -62,6 +70,7 @@ public sealed class MainViewModel : ViewModelBase
         IAssistantSettingsService settings,
         IScenarioRepository scenarioRepository,
         IVoiceCommandSource voiceCommandSource,
+        IAudioInputDeviceService audioInputDevices,
         IVoiceModelService voiceModelService,
         INeuralVoiceModelService neuralVoiceModelService,
         ISpeechSynthesizer speechSynthesizer,
@@ -69,12 +78,17 @@ public sealed class MainViewModel : ViewModelBase
         IAiToolExecutor aiToolExecutor,
         IAiApiKeyStore aiApiKeyStore,
         IPluginCatalog pluginCatalog,
-        IEnumerable<IPluginActivationService> pluginActivations)
+        IEnumerable<IPluginActivationService> pluginActivations,
+        ISystemStartupService systemStartup)
     {
         _engine = engine;
+        _systemStartup = systemStartup;
+        _startWithSystem = settings.Current.StartWithSystem;
+        _detailedFailureInformation = settings.Current.DetailedFailureInformation;
         _settings = settings;
         _scenarioRepository = scenarioRepository;
         _voiceCommandSource = voiceCommandSource;
+        AudioInputSettings = new AudioInputSettingsViewModel(audioInputDevices, settings.Current.AudioInputDeviceId);
         _voiceModelService = voiceModelService;
         _neuralVoiceModelService = neuralVoiceModelService;
         _speechSynthesizer = speechSynthesizer;
@@ -87,12 +101,18 @@ public sealed class MainViewModel : ViewModelBase
             StringComparer.Ordinal);
 
         _assistantName = settings.Current.AssistantName;
+        _voiceActivityDispatcher = new VoiceActivityDispatcher(
+            action => Dispatcher.UIThread.Post(action),
+            text => WakePhraseParser.Parse(text, AssistantName).Kind != WakePhraseKind.NotAddressed,
+            text => IsWakeAnimationActive = _voiceWakeIndicator.ObserveActivity(text, AssistantName),
+            DisplayVoiceActivity);
         _searchProvider = settings.Current.SearchProvider;
         _speakResponses = settings.Current.SpeakResponses;
         _voiceActivationEnabled = settings.Current.VoiceActivationEnabled;
         _aiEnabled = settings.Current.AiEnabled;
         _aiEndpoint = settings.Current.AiEndpoint;
         _aiModel = settings.Current.AiModel;
+        _defaultWeatherCity = settings.Current.DefaultWeatherCity;
         _applicationAliasesText = FormatAliases(settings.Current.Applications);
         _siteAliasesText = FormatAliases(settings.Current.Sites);
         _documentAliasesText = FormatAliases(settings.Current.Documents);
@@ -133,14 +153,22 @@ public sealed class MainViewModel : ViewModelBase
         TestVoiceCommand = new AsyncRelayCommand(TestVoiceAsync);
         TestAiCommand = new AsyncRelayCommand(TestAiAsync);
         DeleteAiApiKeyCommand = new RelayCommand(DeleteAiApiKey);
-        UseExampleCommand = new RelayCommand(() => CommandText = "что ты умеешь");
+        UseExampleCommand = new RelayCommand(() =>
+        {
+            SelectedTabIndex = 3;
+            WindowRequested?.Invoke(this, EventArgs.Empty);
+        });
 
         _voiceCommandSource.StateChanged += OnVoiceStateChanged;
         _voiceCommandSource.CommandRecognized += OnVoiceCommandRecognized;
         _voiceCommandSource.ActivityChanged += OnVoiceActivityChanged;
     }
 
+    public event EventHandler? WindowRequested;
+
     public string Greeting => $"{AssistantName} на связи";
+
+    public AudioInputSettingsViewModel AudioInputSettings { get; }
 
     public ObservableCollection<HistoryItemViewModel> History { get; } = [];
 
@@ -294,6 +322,23 @@ public sealed class MainViewModel : ViewModelBase
         set => SetProperty(ref _speakResponses, value);
     }
 
+    public bool DetailedFailureInformation
+    {
+        get => _detailedFailureInformation;
+        set => SetProperty(ref _detailedFailureInformation, value);
+    }
+
+    public bool StartWithSystem
+    {
+        get => _startWithSystem;
+        set => SetProperty(ref _startWithSystem, value);
+    }
+
+    public bool IsSystemStartupSupported => _systemStartup.IsSupported;
+
+    public IReadOnlyList<CommandHelpEntry> CommandCatalog => CommandHelpCatalog.Build(
+        _engine.AvailableCommands, _pluginCatalog.Plugins, _settings.Current);
+
     public bool VoiceActivationEnabled
     {
         get => _voiceActivationEnabled;
@@ -328,6 +373,12 @@ public sealed class MainViewModel : ViewModelBase
     {
         get => _aiApiKey;
         set => SetProperty(ref _aiApiKey, value);
+    }
+
+    public string DefaultWeatherCity
+    {
+        get => _defaultWeatherCity;
+        set => SetProperty(ref _defaultWeatherCity, value);
     }
 
     public string AiApiKeyWatermark =>
@@ -397,6 +448,7 @@ public sealed class MainViewModel : ViewModelBase
 
     public async Task InitializeAsync()
     {
+        await AudioInputSettings.RefreshAsync();
         var scenarios = await _scenarioRepository.GetAllAsync();
         Scenarios.Clear();
         foreach (var scenario in scenarios)
@@ -412,6 +464,18 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
+    public void SetVoiceActivityVisible(bool visible) =>
+        _voiceActivityDispatcher.SetVisible(visible);
+
+    public void Dispose()
+    {
+        _executionCancellation?.Cancel();
+        _voiceCommandSource.StateChanged -= OnVoiceStateChanged;
+        _voiceCommandSource.CommandRecognized -= OnVoiceCommandRecognized;
+        _voiceCommandSource.ActivityChanged -= OnVoiceActivityChanged;
+        _voiceActivityDispatcher.Dispose();
+    }
+
     private async Task ExecuteAsync()
     {
         if (_isBusy)
@@ -420,12 +484,24 @@ public sealed class MainViewModel : ViewModelBase
         }
 
         _isBusy = true;
+        using var cancellation = new CancellationTokenSource();
+        _executionCancellation = cancellation;
         var request = CommandText.Trim();
         StatusText = "Обрабатываю команду…";
 
         try
         {
-            var result = await _engine.ExecuteAsync(request);
+            CommandResult result;
+            try
+            {
+                result = await _engine.ExecuteAsync(request, cancellation.Token);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                result = CommandResult.Failure($"Не удалось выполнить команду: {exception.Message}");
+            }
+
+            cancellation.Token.ThrowIfCancellationRequested();
             History.Insert(0, new HistoryItemViewModel(
                 request,
                 result.Message,
@@ -444,8 +520,14 @@ public sealed class MainViewModel : ViewModelBase
             {
                 ClientAction.OpenSettings => 2,
                 ClientAction.OpenScenarios => 1,
+                ClientAction.OpenCommandCatalog => 3,
                 _ => SelectedTabIndex
             };
+
+            if (result.ClientAction != ClientAction.None)
+            {
+                WindowRequested?.Invoke(this, EventArgs.Empty);
+            }
 
             if (SpeakResponses && _speechSynthesizer.IsAvailable)
             {
@@ -457,7 +539,7 @@ public sealed class MainViewModel : ViewModelBase
                         await _voiceCommandSource.PauseAsync();
                     }
 
-                    await _speechSynthesizer.SpeakAsync(result.Message);
+                    await _speechSynthesizer.SpeakAsync(SpokenResponse.For(result, DetailedFailureInformation), cancellation.Token);
                 }
                 finally
                 {
@@ -467,6 +549,10 @@ public sealed class MainViewModel : ViewModelBase
                     }
                 }
             }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            StatusText = "Выполнение отменено.";
         }
         catch (Exception exception)
         {
@@ -479,6 +565,7 @@ public sealed class MainViewModel : ViewModelBase
         }
         finally
         {
+            _executionCancellation = null;
             _isBusy = false;
         }
     }
@@ -506,10 +593,23 @@ public sealed class MainViewModel : ViewModelBase
             return;
         }
 
+        try
+        {
+            await _systemStartup.SetEnabledAsync(StartWithSystem);
+        }
+        catch (Exception exception)
+        {
+            StatusText = $"Не удалось изменить автозапуск: {exception.Message}";
+            return;
+        }
+
+        _settings.Current.StartWithSystem = StartWithSystem;
+        _settings.Current.DetailedFailureInformation = DetailedFailureInformation;
         _settings.Current.AssistantName = name;
         _settings.Current.SearchProvider = SearchProvider;
         _settings.Current.SpeakResponses = SpeakResponses;
         _settings.Current.VoiceActivationEnabled = VoiceActivationEnabled;
+        _settings.Current.AudioInputDeviceId = AudioInputSettings.SelectedDeviceId;
         _settings.Current.AiEnabled = AiEnabled;
         _settings.Current.AiEndpoint = AiEndpoint.Trim();
         _settings.Current.AiModel = AiModel.Trim();
@@ -536,6 +636,7 @@ public sealed class MainViewModel : ViewModelBase
         }
         await _settings.SaveAsync();
 
+        RaisePropertyChanged(nameof(CommandCatalog));
         var pluginResult = await ApplyPluginActivationsAsync();
 
         if (VoiceActivationEnabled)
@@ -746,6 +847,12 @@ public sealed class MainViewModel : ViewModelBase
         error = string.Empty;
         var endpoint = AiEndpoint.Trim();
         var model = AiModel.Trim();
+        var weatherCity = DefaultWeatherCity.Trim();
+        if (weatherCity.Length > 0 && !Egorik.Core.Weather.WeatherLocation.IsValid(weatherCity))
+        {
+            error = "Для погоды укажите название города длиной до 100 символов.";
+            return false;
+        }
 
         if (AiEnabled)
         {
@@ -783,6 +890,7 @@ public sealed class MainViewModel : ViewModelBase
         _settings.Current.AiEnabled = AiEnabled;
         _settings.Current.AiEndpoint = endpoint;
         _settings.Current.AiModel = model;
+        _settings.Current.DefaultWeatherCity = weatherCity;
         return true;
     }
 
@@ -915,40 +1023,64 @@ public sealed class MainViewModel : ViewModelBase
 
     private void OnVoiceStateChanged(
         object? sender,
-        VoiceInputStateChangedEventArgs eventArgs) =>
+        VoiceInputStateChangedEventArgs eventArgs)
+    {
+        _voiceActivityDispatcher.ClearPendingWake();
+        if (eventArgs.State == VoiceInputState.Suppressed)
+        {
+            Interlocked.Increment(ref _voiceSuppressionVersion);
+        }
+
         Dispatcher.UIThread.Post(() =>
         {
+            if (eventArgs.State == VoiceInputState.Suppressed)
+            {
+                _executionCancellation?.Cancel();
+                VoiceActivityText = eventArgs.Message;
+                VoiceInputLevel = 0;
+            }
+
             IsWakeAnimationActive = _voiceWakeIndicator.ObserveState(eventArgs.State);
             VoiceStatusText = eventArgs.Message;
             StatusText = eventArgs.Message;
         });
+    }
 
     private void OnVoiceCommandRecognized(
         object? sender,
-        VoiceCommandRecognizedEventArgs eventArgs) =>
+        VoiceCommandRecognizedEventArgs eventArgs)
+    {
+        _voiceActivityDispatcher.ClearPendingWake();
+        var version = Volatile.Read(ref _voiceSuppressionVersion);
         Dispatcher.UIThread.Post(async () =>
         {
+            if (version != Volatile.Read(ref _voiceSuppressionVersion) ||
+                _voiceCommandSource.State == VoiceInputState.Suppressed)
+            {
+                return;
+            }
+
             IsWakeAnimationActive = _voiceWakeIndicator.AcceptCommand();
             CommandText = eventArgs.Text;
             await ExecuteAsync();
         });
+    }
 
     private void OnVoiceActivityChanged(
         object? sender,
         VoiceInputActivityEventArgs eventArgs) =>
-        Dispatcher.UIThread.Post(() =>
+        _voiceActivityDispatcher.Publish(eventArgs);
+
+    private void DisplayVoiceActivity(VoiceInputActivityEventArgs eventArgs)
+    {
+        VoiceInputLevel = eventArgs.Level * 100;
+        if (!string.IsNullOrWhiteSpace(eventArgs.PartialText))
         {
-            IsWakeAnimationActive = _voiceWakeIndicator.ObserveActivity(
-                eventArgs.PartialText,
-                AssistantName);
-            VoiceInputLevel = eventArgs.Level * 100;
-            if (!string.IsNullOrWhiteSpace(eventArgs.PartialText))
-            {
-                VoiceActivityText = $"Слышу: «{eventArgs.PartialText}»";
-            }
-            else if (eventArgs.Level >= 0.08)
-            {
-                VoiceActivityText = "Микрофон слышит звук…";
-            }
-        });
+            VoiceActivityText = $"Слышу: «{eventArgs.PartialText}»";
+        }
+        else if (eventArgs.Level >= 0.08)
+        {
+            VoiceActivityText = "Микрофон слышит звук…";
+        }
+    }
 }

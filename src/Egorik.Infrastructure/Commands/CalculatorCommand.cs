@@ -1,9 +1,10 @@
 using System.Globalization;
+using Egorik.Core.Ai;
 using Egorik.Core.Commands;
 
 namespace Egorik.Infrastructure.Commands;
 
-public sealed class CalculatorCommand : IAssistantCommand
+public sealed class CalculatorCommand(IAiPlanner? planner = null) : IAssistantCommand
 {
     public CommandDescriptor Descriptor { get; } = new(
         "calculator.evaluate",
@@ -14,6 +15,12 @@ public sealed class CalculatorCommand : IAssistantCommand
         string normalizedText,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (planner?.IsConfigured == true)
+        {
+            return ValueTask.FromResult<CommandMatch?>(null);
+        }
+
         var expression = CommandText.AfterPrefix(
             normalizedText,
             "сколько будет",

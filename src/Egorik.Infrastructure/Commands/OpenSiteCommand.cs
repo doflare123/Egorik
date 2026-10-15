@@ -29,10 +29,7 @@ public sealed partial class OpenSiteCommand(
             return ValueTask.FromResult<CommandMatch?>(null);
         }
 
-        var site = settings.Current.Sites.Keys
-            .OrderByDescending(alias => alias.Length)
-            .FirstOrDefault(alias =>
-                KnownEntityMatcher.IsMatch(alias, explicitTarget));
+        var site = KnownEntityMatcher.FindUniqueMatch(settings.Current.Sites.Keys, explicitTarget);
 
         if (site is not null)
         {

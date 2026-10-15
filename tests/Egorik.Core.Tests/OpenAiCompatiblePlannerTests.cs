@@ -106,6 +106,8 @@ public sealed class OpenAiCompatiblePlannerTests
     [DataRow("file:///c:/temp/api", false)]
     [DataRow("http://localhost:1234/v1/chat/completions", true)]
     [DataRow("https://api.example.com/v1/chat/completions", true)]
+    [DataRow("http://api.example.com/v1", false)]
+    [DataRow("http://localhost:1234/v1", true)]
     public void TryGetSafeEndpoint_OnlyAllowsHttpsOrLoopbackHttp(
         string value,
         bool expected)
@@ -113,6 +115,56 @@ public sealed class OpenAiCompatiblePlannerTests
         Assert.AreEqual(
             expected,
             OpenAiCompatiblePlanner.TryGetSafeEndpoint(value, out _));
+    }
+
+    [TestMethod]
+    [DataRow("https://example.test/v1", "https://example.test/v1/chat/completions")]
+    [DataRow("https://example.test/v1/", "https://example.test/v1/chat/completions")]
+    [DataRow("https://example.test/provider/v1", "https://example.test/provider/v1/chat/completions")]
+    [DataRow("https://example.test/provider/v1/", "https://example.test/provider/v1/chat/completions")]
+    [DataRow("https://api.coldset.xyz/deepseekvladimir/v1", "https://api.coldset.xyz/deepseekvladimir/v1/chat/completions")]
+    [DataRow("http://localhost:1234/v1", "http://localhost:1234/v1/chat/completions")]
+    [DataRow("https://example.test/provider/v1?region=ru", "https://example.test/provider/v1/chat/completions?region=ru")]
+    [DataRow("https://example.test/v1/chat/completions", "https://example.test/v1/chat/completions")]
+    [DataRow("https://example.test/api/chat/completions/", "https://example.test/api/chat/completions/")]
+    [DataRow("https://example.test/custom-endpoint", "https://example.test/custom-endpoint")]
+    [DataRow("https://example.test/provider-v1", "https://example.test/provider-v1")]
+    public async Task CreatePlanAsync_ResolvesApiBaseAndPreservesExplicitEndpoints(string configured, string expected)
+    {
+        var handler = new RecordingHandler(CreatePlanResponse());
+        using var client = new HttpClient(handler);
+        var settings = new MemorySettingsService();
+        settings.Current.AiEnabled = true;
+        settings.Current.AiEndpoint = configured;
+        var planner = new OpenAiCompatiblePlanner(client, settings, new MemoryApiKeyStore(null));
+
+        var plan = await planner.CreatePlanAsync("Привет", [
+            new AiToolDescriptor("assistant_reply", "Ответить", [new AiToolParameterDescriptor("message", "Текст")])
+        ]);
+
+        Assert.IsNotNull(plan);
+        Assert.AreEqual(expected, handler.RequestUri?.AbsoluteUri);
+        Assert.AreEqual(HttpMethod.Post, handler.Method);
+        Assert.AreEqual(configured, settings.Current.AiEndpoint);
+    }
+
+    [TestMethod]
+    public async Task CreatePlanAsync_MethodNotAllowedExplainsEndpointProblem()
+    {
+        var handler = new RecordingHandler("{\"detail\":\"Method Not Allowed\"}", HttpStatusCode.MethodNotAllowed);
+        using var client = new HttpClient(handler);
+        var settings = new MemorySettingsService();
+        settings.Current.AiEnabled = true;
+        var planner = new OpenAiCompatiblePlanner(client, settings, new MemoryApiKeyStore("secret-key"));
+
+        var exception = await Assert.ThrowsExactlyAsync<AiPlannerException>(async () =>
+            await planner.CreatePlanAsync("Привет", [
+                new AiToolDescriptor("assistant_reply", "Ответить", [new AiToolParameterDescriptor("message", "Текст")])
+            ]));
+
+        StringAssert.Contains(exception.Message, "405");
+        StringAssert.Contains(exception.Message, "/v1/chat/completions");
+        Assert.IsFalse(exception.Message.Contains("secret-key", StringComparison.Ordinal));
     }
 
     private static string CreatePlanResponse()
@@ -161,8 +213,12 @@ public sealed class OpenAiCompatiblePlannerTests
         });
     }
 
-    private sealed class RecordingHandler(string responseBody) : HttpMessageHandler
+    private sealed class RecordingHandler(string responseBody, HttpStatusCode statusCode = HttpStatusCode.OK) : HttpMessageHandler
     {
+        public Uri? RequestUri { get; private set; }
+
+        public HttpMethod? Method { get; private set; }
+
         public string? RequestBody { get; private set; }
 
         public string? AuthorizationScheme { get; private set; }
@@ -173,10 +229,12 @@ public sealed class OpenAiCompatiblePlannerTests
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
+            RequestUri = request.RequestUri;
+            Method = request.Method;
             RequestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
             AuthorizationScheme = request.Headers.Authorization?.Scheme;
             AuthorizationParameter = request.Headers.Authorization?.Parameter;
-            return new HttpResponseMessage(HttpStatusCode.OK)
+            return new HttpResponseMessage(statusCode)
             {
                 Content = new StringContent(
                     responseBody,

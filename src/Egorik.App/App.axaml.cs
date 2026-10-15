@@ -128,6 +128,7 @@ public sealed partial class App : Application
             DataContext = viewModel
         };
         mainWindow.Closing += OnMainWindowClosing;
+        viewModel.WindowRequested += (_, _) => ShowMainWindow();
 
         _wakeOverlayWindow?.Dispose();
         _wakeOverlayWindow = overlayWindow;
@@ -138,7 +139,16 @@ public sealed partial class App : Application
         }
 
         desktop.MainWindow = mainWindow;
-        mainWindow.Show();
+        var startInTray = desktop.Args?.Contains("--tray", StringComparer.Ordinal) == true;
+        if (startInTray && _trayIcon is not null)
+        {
+            mainWindow.ShowInTaskbar = false;
+        }
+        else
+        {
+            mainWindow.Show();
+        }
+
         desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
     }
 

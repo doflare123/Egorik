@@ -30,7 +30,8 @@ public enum ClientAction
 {
     None,
     OpenSettings,
-    OpenScenarios
+    OpenScenarios,
+    OpenCommandCatalog
 }
 
 public sealed record CommandResult(

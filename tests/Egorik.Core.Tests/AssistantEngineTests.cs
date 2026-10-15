@@ -2,12 +2,73 @@ using Egorik.Core.Ai;
 using Egorik.Core.Commands;
 using Egorik.Core.Configuration;
 using Egorik.Core.Scenarios;
+using Egorik.Core.Platform;
+using Egorik.Infrastructure.Commands;
+using Egorik.Infrastructure.Ai;
 
 namespace Egorik.Core.Tests;
 
 [TestClass]
 public sealed class AssistantEngineTests
 {
+    [TestMethod]
+    [DataRow("посчитай 2 + 3 * 4")]
+    [DataRow("посчитай интеграл от x в квадрате")]
+    public async Task ConfiguredAiReceivesComputationsAfterScenarioAndOtherCommands(string request)
+    {
+        var planner = new FixedAiPlanner(new AiPlan([new PlannedToolCall("assistant_reply",
+            new Dictionary<string, string> { ["message"] = "Разобрал пример." })]));
+        var engine = new AssistantEngine(new CommandRouter([new CalculatorCommand(planner)]),
+            new MemoryScenarioRepository([]), new MemorySettingsService(), planner,
+            new AiToolExecutor([new AssistantReplyAiTool()]));
+
+        var result = await engine.ExecuteAsync(request);
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.AreEqual("Разобрал пример.", result.Message);
+        Assert.AreEqual(1, planner.Calls);
+    }
+
+    [TestMethod]
+    public async Task SearchStaysDeterministicEvenWhenQueryContainsWeatherAndNumbers()
+    {
+        var planner = new FixedAiPlanner(new AiPlan([]));
+        var browser = new RecordingBrowser();
+        var settings = new MemorySettingsService();
+        var engine = new AssistantEngine(new CommandRouter([new CalculatorCommand(planner), new WebSearchCommand(settings, browser)]),
+            new MemoryScenarioRepository([]), settings, planner, new AiToolExecutor([]));
+
+        var result = await engine.ExecuteAsync("найди точную погоду в калининграде на 5 октября");
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.AreEqual("точную погоду в калининграде на 5 октября", browser.Query);
+        Assert.AreEqual(0, planner.Calls);
+    }
+
+    [TestMethod]
+    public async Task ArithmeticRemainsLocalWhenAiIsUnavailable()
+    {
+        var planner = new DisabledAiPlanner();
+        var engine = new AssistantEngine(new CommandRouter([new CalculatorCommand(planner)]),
+            new MemoryScenarioRepository([]), new MemorySettingsService(), planner, new AiToolExecutor([]));
+
+        var result = await engine.ExecuteAsync("посчитай 2 + 3 * 4");
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.AreEqual("Получается 14.", result.Message);
+    }
+
+    private sealed class RecordingBrowser : IWebBrowserService
+    {
+        public string? Query { get; private set; }
+        public ValueTask<LaunchResult> OpenUrlAsync(Uri uri, CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(new LaunchResult(true, "Готово"));
+        public ValueTask<LaunchResult> SearchAsync(string query, string provider, CancellationToken cancellationToken = default)
+        {
+            Query = query;
+            return ValueTask.FromResult(new LaunchResult(true, "Готово"));
+        }
+    }
     [TestMethod]
     public async Task ExecuteAsync_RemovesAssistantNameBeforeRouting()
     {
@@ -115,11 +176,16 @@ public sealed class AssistantEngineTests
     {
         public bool IsConfigured => true;
 
+        public int Calls { get; private set; }
+
         public ValueTask<AiPlan?> CreatePlanAsync(
             string userRequest,
             IReadOnlyList<AiToolDescriptor> availableTools,
-            CancellationToken cancellationToken = default) =>
-            ValueTask.FromResult<AiPlan?>(plan);
+            CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            return ValueTask.FromResult<AiPlan?>(plan);
+        }
     }
 
     private sealed class RecordingAiTool(List<string> calls) : IAiTool

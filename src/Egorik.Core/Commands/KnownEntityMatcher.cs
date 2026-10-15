@@ -2,6 +2,20 @@ namespace Egorik.Core.Commands;
 
 public static class KnownEntityMatcher
 {
+    public static string? FindUniqueMatch(IEnumerable<string> aliases, string spokenValue)
+    {
+        var candidates = aliases.ToArray();
+        var normalized = TextNormalizer.Normalize(spokenValue);
+        var exact = candidates.Where(alias => TextNormalizer.Normalize(alias) == normalized).Take(2).ToArray();
+        if (exact.Length > 0)
+        {
+            return exact.Length == 1 ? exact[0] : null;
+        }
+
+        var matches = candidates.Where(alias => IsMatch(alias, spokenValue)).Take(2).ToArray();
+        return matches.Length == 1 ? matches[0] : null;
+    }
+
     private static readonly string[] RussianEndings =
     [
         "иями", "ями", "ами", "ого", "ему", "ыми", "ими",
@@ -24,11 +38,20 @@ public static class KnownEntityMatcher
             return true;
         }
 
+        if (known.Replace(" ", string.Empty, StringComparison.Ordinal) ==
+            spoken.Replace(" ", string.Empty, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
         var knownWords = known.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var spokenWords = spoken.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (knownWords.Length != spokenWords.Length)
         {
-            return false;
+            // Repair word boundaries only when letters (or known inflections) agree.
+            var knownCompact = RemoveRussianEnding(known.Replace(" ", string.Empty, StringComparison.Ordinal));
+            var spokenCompact = RemoveRussianEnding(spoken.Replace(" ", string.Empty, StringComparison.Ordinal));
+            return knownCompact.Length >= 4 && knownCompact == spokenCompact;
         }
 
         var approximateWords = 0;

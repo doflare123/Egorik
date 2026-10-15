@@ -64,7 +64,11 @@ public enum YandexMusicAction
     PlayPause,
     Next,
     Previous,
-    Stop
+    Stop,
+    VolumeUp,
+    VolumeDown,
+    Mute,
+    Unmute
 }
 
 public interface IYandexMusicController
@@ -82,6 +86,15 @@ public interface IYandexMusicController
     ValueTask<LaunchResult> ExecuteAsync(
         YandexMusicAction action,
         CancellationToken cancellationToken = default);
+
+    ValueTask<LaunchResult> SetVolumeAsync(int percent, CancellationToken cancellationToken = default);
+}
+
+public interface IYandexMusicVolumeService
+{
+    ValueTask<LaunchResult> AdjustAsync(YandexMusicAction action, CancellationToken cancellationToken = default);
+
+    ValueTask<LaunchResult> SetAsync(int percent, CancellationToken cancellationToken = default);
 }
 
 public sealed record SpreadsheetCellMatch(

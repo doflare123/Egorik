@@ -1,5 +1,15 @@
 namespace Egorik.Core.Speech;
 
+public sealed record AudioInputDevice(string Id, string Name)
+{
+    public static AudioInputDevice SystemDefault { get; } = new(string.Empty, "По умолчанию Windows");
+}
+
+public interface IAudioInputDeviceService
+{
+    ValueTask<IReadOnlyList<AudioInputDevice>> GetDevicesAsync(CancellationToken cancellationToken = default);
+}
+
 public interface IWakeWordDetector : IAsyncDisposable
 {
     bool IsAvailable { get; }
@@ -34,7 +44,8 @@ public enum VoiceInputState
     Starting,
     WaitingForWakeWord,
     ListeningForCommand,
-    Error
+    Error,
+    Suppressed
 }
 
 public sealed record VoiceInputStateChangedEventArgs(

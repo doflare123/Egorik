@@ -29,11 +29,7 @@ public sealed class HelpCommand : IAssistantCommand
         CommandMatch match,
         CancellationToken cancellationToken = default) =>
         ValueTask.FromResult(CommandResult.Success(
-            "Я умею открывать приложения и сайты, искать в интернете, считать, " +
-            "сообщать дату и время, управлять медиа, открывать браузер по умолчанию, " +
-            "работать со Steam и Яндекс Музыкой через безопасные действия и " +
-            "создавать новые заметки Word, искать в разрешённых книгах Excel и " +
-            "выполнять пользовательские сценарии. Декларативный плагин Dota 2 " +
-            "после включения понимает команды вроде «пикни Пуджа».",
-            Descriptor.Id));
+            "Открываю справочник команд.",
+            Descriptor.Id,
+            ClientAction.OpenCommandCatalog));
 }

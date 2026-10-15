@@ -13,7 +13,11 @@ public sealed class YandexMusicApplicationIntegration(
             ["play_pause"] = YandexMusicAction.PlayPause,
             ["next"] = YandexMusicAction.Next,
             ["previous"] = YandexMusicAction.Previous,
-            ["stop"] = YandexMusicAction.Stop
+            ["stop"] = YandexMusicAction.Stop,
+            ["volume_up"] = YandexMusicAction.VolumeUp,
+            ["volume_down"] = YandexMusicAction.VolumeDown,
+            ["mute"] = YandexMusicAction.Mute,
+            ["unmute"] = YandexMusicAction.Unmute
         };
 
     private static readonly ApplicationActionDescriptor OpenAction = new(
@@ -73,6 +77,19 @@ public sealed class YandexMusicApplicationIntegration(
                 "Остановить воспроизведение",
                 "Останавливает медиасессию приложения Яндекс Музыка.",
                 [],
+                IsAvailableToAi: true),
+            new ApplicationActionDescriptor("volume_up", "Музыку громче",
+                "Повышает только громкость аудиосессий Яндекс Музыки на 10 процентных пунктов.", [], IsAvailableToAi: true),
+            new ApplicationActionDescriptor("volume_down", "Музыку тише",
+                "Понижает только громкость аудиосессий Яндекс Музыки на 10 процентных пунктов.", [], IsAvailableToAi: true),
+            new ApplicationActionDescriptor("mute", "Отключить звук музыки",
+                "Отключает звук только аудиосессий Яндекс Музыки.", [], IsAvailableToAi: true),
+            new ApplicationActionDescriptor("unmute", "Включить звук музыки",
+                "Включает звук только аудиосессий Яндекс Музыки.", [], IsAvailableToAi: true),
+            new ApplicationActionDescriptor("set_volume", "Громкость музыки в процентах",
+                "Устанавливает громкость только аудиосессий Яндекс Музыки, не колонок и других приложений.",
+                [new ApplicationActionParameterDescriptor("percent", "Целое число процентов от 0 до 100.",
+                    MaxLength: 3, AllowedValues: Enumerable.Range(0, 101).Select(value => value.ToString(System.Globalization.CultureInfo.InvariantCulture)).ToArray())],
                 IsAvailableToAi: true)
         ]);
 
@@ -100,7 +117,14 @@ public sealed class YandexMusicApplicationIntegration(
         {
             result = await controller.StartMyWaveAsync(cancellationToken);
         }
-        else if (MediaActions.TryGetValue(request.ActionId, out var mediaAction))
+        else if (request.ActionId == "set_volume" && request.Arguments.Count == 1 &&
+                 request.Arguments.TryGetValue("percent", out var percentText) &&
+                 int.TryParse(percentText, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var percent) &&
+                 percent is >= 0 and <= 100)
+        {
+            result = await controller.SetVolumeAsync(percent, cancellationToken);
+        }
+        else if (MediaActions.TryGetValue(request.ActionId, out var mediaAction) && request.Arguments.Count == 0)
         {
             result = await controller.ExecuteAsync(mediaAction, cancellationToken);
         }

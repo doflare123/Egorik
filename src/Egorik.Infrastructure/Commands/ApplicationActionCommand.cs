@@ -46,6 +46,12 @@ public sealed class ApplicationActionCommand(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
+        var volumeMatch = MatchYandexMusicVolume(normalizedText);
+        if (volumeMatch is not null)
+        {
+            return volumeMatch.Value;
+        }
+
         if (TryMatchYandexMusicAction(normalizedText, out var mediaAction))
         {
             return Match("yandex_music", mediaAction, 0.99);
@@ -262,6 +268,63 @@ public sealed class ApplicationActionCommand(
                StartMyWavePhrases.Contains(text[..marker], StringComparer.Ordinal) &&
                YandexMusicAliases().Any(alias =>
                    KnownEntityMatcher.IsMatch(alias, text[(marker + 3)..]));
+    }
+
+    private ValueTask<CommandMatch?>? MatchYandexMusicVolume(string text)
+    {
+        var aliases = YandexMusicAliases().Append("музыка").ToArray();
+        bool IsMusic(string value) => aliases.Any(alias => KnownEntityMatcher.IsMatch(alias, value));
+        (string Prefix, string Suffix, string Action)[] patterns =
+        [
+            ("сделай ", " громче", "volume_up"), ("сделай ", " тише", "volume_down"),
+            ("сделай ", " погромче", "volume_up"), ("сделай ", " потише", "volume_down"),
+            ("", " погромче", "volume_up"), ("", " потише", "volume_down"),
+            ("прибавь громкость ", "", "volume_up"), ("убавь громкость ", "", "volume_down"),
+            ("увеличь громкость ", "", "volume_up"), ("уменьши громкость ", "", "volume_down"),
+            ("выключи звук в ", "", "mute"), ("включи звук в ", "", "unmute"),
+            ("сделай громче в ", "", "volume_up"), ("сделай тише в ", "", "volume_down")
+        ];
+        foreach (var (prefix, suffix, action) in patterns)
+        {
+            if (text.StartsWith(prefix, StringComparison.Ordinal) && text.EndsWith(suffix, StringComparison.Ordinal) &&
+                text.Length > prefix.Length + suffix.Length && IsMusic(text[prefix.Length..(text.Length - suffix.Length)]))
+            {
+                return Match("yandex_music", action, 0.995);
+            }
+        }
+
+        var targetAndLevel = CommandText.AfterPrefix(text, "установи громкость", "поставь громкость", "сделай громкость", "громкость");
+        if (targetAndLevel is null)
+        {
+            return null;
+        }
+
+        foreach (var ending in new[] { " процентов", " процента", " процент" })
+        {
+            if (targetAndLevel.EndsWith(ending, StringComparison.Ordinal))
+            {
+                targetAndLevel = targetAndLevel[..^ending.Length];
+                break;
+            }
+        }
+
+        var separator = targetAndLevel.LastIndexOf(' ');
+        if (separator < 1 || !int.TryParse(targetAndLevel[(separator + 1)..],
+                System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var percent) ||
+            percent is < 0 or > 100)
+        {
+            return null;
+        }
+
+        var target = targetAndLevel[..separator];
+        if (target.EndsWith(" на", StringComparison.Ordinal))
+        {
+            target = target[..^3];
+        }
+
+        return IsMusic(target)
+            ? Match("yandex_music", "set_volume", 0.995, ("percent", percent.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+            : null;
     }
 
     private bool MatchesApplicationAlias(string applicationId, string spokenValue) =>

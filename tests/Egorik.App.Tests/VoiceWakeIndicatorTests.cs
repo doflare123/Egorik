@@ -7,6 +7,23 @@ namespace Egorik.App.Tests;
 public sealed class VoiceWakeIndicatorTests
 {
     [TestMethod]
+    public void FinalizedWakePhraseKeepsIndicatorVisibleWhileWaitingForContinuation()
+    {
+        var indicator = new VoiceWakeIndicator();
+        var buffer = new SpeechPhraseBuffer();
+        buffer.AddFinal("егорик открой", TimeSpan.Zero);
+
+        Assert.IsTrue(indicator.ObserveActivity(buffer.PreviewText, "Егорик"));
+        Assert.IsNull(buffer.TakeReadyPhrase(TimeSpan.FromMilliseconds(500)));
+        buffer.UpdatePartial("браузер", TimeSpan.FromMilliseconds(600));
+        Assert.AreEqual("егорик открой браузер", buffer.PreviewText);
+        Assert.IsTrue(indicator.ObserveActivity(buffer.PreviewText, "Егорик"));
+        buffer.AddFinal("браузер", TimeSpan.FromMilliseconds(700));
+        Assert.IsNotNull(buffer.TakeReadyPhrase(TimeSpan.FromSeconds(2)));
+        Assert.IsFalse(indicator.AcceptCommand());
+    }
+
+    [TestMethod]
     public void WakeNameInPartialSpeechActivatesUntilCommandIsAccepted()
     {
         var indicator = new VoiceWakeIndicator();

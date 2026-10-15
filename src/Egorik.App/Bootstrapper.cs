@@ -8,6 +8,7 @@ using Egorik.Core.Platform;
 using Egorik.Core.Plugins;
 using Egorik.Core.Scenarios;
 using Egorik.Core.Speech;
+using Egorik.Core.Weather;
 using Egorik.Infrastructure.Ai;
 using Egorik.Infrastructure.Applications;
 using Egorik.Infrastructure.Commands;
@@ -15,6 +16,7 @@ using Egorik.Infrastructure.Persistence;
 using Egorik.Infrastructure.Platform;
 using Egorik.Infrastructure.Plugins;
 using Egorik.Infrastructure.Speech;
+using Egorik.Infrastructure.Weather;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Egorik.App;
@@ -39,6 +41,7 @@ internal static class Bootstrapper
         services.AddSingleton<IWebBrowserService, DesktopWebBrowserService>();
         services.AddSingleton<IMediaControlService, DesktopMediaControlService>();
         services.AddSingleton<IYandexMusicController, DesktopYandexMusicController>();
+        services.AddSingleton<IYandexMusicVolumeService, DesktopYandexMusicVolumeService>();
         services.AddSingleton<IOfficeDocumentService, OpenXmlOfficeDocumentService>();
         services.AddSingleton<DesktopDotaHeroPicker>();
         services.AddSingleton<IDotaHeroPicker>(services =>
@@ -56,6 +59,8 @@ internal static class Bootstrapper
         services.AddSingleton<IApplicationActionRegistry, ApplicationActionRegistry>();
         services.AddSingleton<IDesktopOverlayWindowService, DesktopOverlayWindowService>();
         services.AddSingleton<IClock, SystemClock>();
+        services.AddSingleton<ISystemStartupService, DesktopSystemStartupService>();
+        services.AddSingleton<IWeatherService, OpenMeteoWeatherService>();
         services.AddSingleton<IAiApiKeyStore, DpapiAiApiKeyStore>();
         services.AddSingleton<IAiPlanner, OpenAiCompatiblePlanner>();
         services.AddSingleton<IAiTool, ApplicationOpenAiTool>();
@@ -68,10 +73,14 @@ internal static class Bootstrapper
         services.AddSingleton<IAiTool, DateTimeAiTool>();
         services.AddSingleton<IAiTool, ClientNavigateAiTool>();
         services.AddSingleton<IAiTool, AssistantReplyAiTool>();
+        services.AddSingleton<IAiTool, WeatherAiTool>();
         services.AddSingleton<IAiToolExecutor, AiToolExecutor>();
         services.AddSingleton<IVoiceModelService, VoskVoiceModelService>();
         services.AddSingleton<INeuralVoiceModelService, SherpaNeuralVoiceModelService>();
         services.AddSingleton<IVoiceCommandSource, VoskVoiceCommandSource>();
+        services.AddSingleton<WindowsAudioInputDeviceService>();
+        services.AddSingleton<IAudioInputDeviceService>(services => services.GetRequiredService<WindowsAudioInputDeviceService>());
+        services.AddSingleton<IWaveInputDeviceCatalog>(services => services.GetRequiredService<WindowsAudioInputDeviceService>());
         services.AddSingleton<WindowsSpeechSynthesizer>();
         services.AddSingleton<ISpeechSynthesizer, NeuralSpeechSynthesizer>();
 

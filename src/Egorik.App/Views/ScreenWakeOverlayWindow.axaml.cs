@@ -25,6 +25,16 @@ public sealed partial class ScreenWakeOverlayWindow : Window, IDisposable
         : this() =>
         _platformService = platformService;
 
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == IsVisibleProperty)
+        {
+            // Hiding a window does not remove its animation subscriptions.
+            Classes.Set("wake-active", IsVisible);
+        }
+    }
+
     public void Connect(MainViewModel viewModel)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -100,9 +110,12 @@ public sealed partial class ScreenWakeOverlayWindow : Window, IDisposable
 
     private void OnOpened(object? sender, EventArgs eventArgs)
     {
-        _hasOpened = true;
         FitPrimaryScreen();
-        Screens.Changed += OnScreensChanged;
+        if (!_hasOpened)
+        {
+            _hasOpened = true;
+            Screens.Changed += OnScreensChanged;
+        }
 
         var handle = TryGetPlatformHandle();
         if (handle is not null && _platformService is not null)

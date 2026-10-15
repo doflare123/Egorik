@@ -11,7 +11,9 @@ public sealed record PluginManifest(
     IReadOnlyList<PluginCommandManifest>? Commands = null,
     string Kind = "declarative",
     string? EntryPoint = null,
-    IReadOnlyList<string>? DataFiles = null);
+    IReadOnlyList<string>? DataFiles = null,
+    string Description = "",
+    IReadOnlyList<string>? Examples = null);
 
 public sealed record PluginCommandManifest(
     string Id,

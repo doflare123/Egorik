@@ -29,6 +29,24 @@ public static class WakePhraseParser
             return NotAddressed(normalized);
         }
 
+        // An explicit address can interrupt background speech. A bare name inside
+        // a sentence is still treated as a mention, never as an approximate wake.
+        var explicitAddress = "слушай " + wakeName;
+        var addressIndex = normalized.IndexOf(explicitAddress, StringComparison.Ordinal);
+        if (addressIndex >= 0 && (addressIndex == 0 || normalized[addressIndex - 1] == ' '))
+        {
+            var end = addressIndex + explicitAddress.Length;
+            if (end == normalized.Length)
+            {
+                return WakeOnly(normalized, explicitAddress, false);
+            }
+
+            if (normalized[end] == ' ')
+            {
+                return Command(normalized, normalized[(end + 1)..], explicitAddress, false);
+            }
+        }
+
         if (string.Equals(normalized, wakeName, StringComparison.Ordinal))
         {
             return WakeOnly(normalized, wakeName, false);

@@ -62,12 +62,15 @@ public sealed class JsonAssistantSettingsService(ApplicationDataPaths paths)
             ? "Егорик"
             : settings.AssistantName.Trim();
 
+        settings.AudioInputDeviceId = settings.AudioInputDeviceId?.Trim() ?? string.Empty;
+
         settings.AiEndpoint = string.IsNullOrWhiteSpace(settings.AiEndpoint)
             ? "https://api.openai.com/v1/chat/completions"
             : settings.AiEndpoint.Trim();
         settings.AiModel = string.IsNullOrWhiteSpace(settings.AiModel)
             ? "gpt-4o-mini"
             : settings.AiModel.Trim();
+        settings.DefaultWeatherCity = settings.DefaultWeatherCity?.Trim() ?? "Калининград";
 
         settings.Applications = new Dictionary<string, string>(
             settings.Applications ?? [],

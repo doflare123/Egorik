@@ -17,7 +17,7 @@
     WindowDecorations="None"
     WindowStartupLocation="Manual">
   <Window.Styles>
-    <Style Selector="Rectangle.wake-ambient">
+    <Style Selector="Window.wake-active Rectangle.wake-ambient">
       <Style.Animations>
         <Animation
             Duration="0:0:1.4"
@@ -36,7 +36,7 @@
       </Style.Animations>
     </Style>
 
-    <Style Selector="Rectangle.wake-tracer">
+    <Style Selector="Window.wake-active Rectangle.wake-tracer">
       <Style.Animations>
         <Animation Duration="0:0:3.8" IterationCount="INFINITE">
           <KeyFrame Cue="0%">
