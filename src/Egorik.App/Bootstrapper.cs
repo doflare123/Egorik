@@ -1,5 +1,6 @@
 using Egorik.App.ViewModels;
 using Egorik.Core;
+using Egorik.Core.Actions;
 using Egorik.Core.Ai;
 using Egorik.Core.Applications;
 using Egorik.Core.Commands;
@@ -10,6 +11,7 @@ using Egorik.Core.Scenarios;
 using Egorik.Core.Speech;
 using Egorik.Core.Weather;
 using Egorik.Infrastructure.Ai;
+using Egorik.Infrastructure.Actions;
 using Egorik.Infrastructure.Applications;
 using Egorik.Infrastructure.Commands;
 using Egorik.Infrastructure.Persistence;
@@ -75,6 +77,11 @@ internal static class Bootstrapper
         services.AddSingleton<IAiTool, AssistantReplyAiTool>();
         services.AddSingleton<IAiTool, WeatherAiTool>();
         services.AddSingleton<IAiToolExecutor, AiToolExecutor>();
+        services.AddSingleton<IAssistantActionProvider, BuiltInActionProvider>();
+        services.AddSingleton<IAssistantActionProvider, ApplicationIntegrationActionProvider>();
+        services.AddSingleton<IAssistantActionProvider, DeclarativePluginActionProvider>();
+        services.AddSingleton<IAssistantActionRegistry, AssistantActionRegistry>();
+        services.AddSingleton<IScenarioFlowExecutor, ScenarioFlowExecutor>();
         services.AddSingleton<IVoiceModelService, VoskVoiceModelService>();
         services.AddSingleton<INeuralVoiceModelService, SherpaNeuralVoiceModelService>();
         services.AddSingleton<IVoiceCommandSource, VoskVoiceCommandSource>();
@@ -101,6 +108,7 @@ internal static class Bootstrapper
 
         services.AddTransient<OnboardingViewModel>();
         services.AddTransient<MainViewModel>();
+        services.AddTransient<ScenarioEditorViewModel>();
 
         return services.BuildServiceProvider();
     }

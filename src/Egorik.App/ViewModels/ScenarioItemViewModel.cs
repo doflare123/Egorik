@@ -10,5 +10,5 @@ public sealed class ScenarioItemViewModel(AssistantScenario scenario)
 
     public string Trigger => $"«{Model.Trigger}»";
 
-    public string Summary => $"{Model.Commands.Count} действий";
+    public string Summary => Model.Flow is null ? $"{Model.Commands.Count} команд" : $"{Model.Flow.Nodes.Count} блоков";
 }

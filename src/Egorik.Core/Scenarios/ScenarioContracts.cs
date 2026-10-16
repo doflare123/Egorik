@@ -10,6 +10,8 @@ public sealed class AssistantScenario
 
     public List<string> Commands { get; set; } = [];
 
+    public ScenarioFlow? Flow { get; set; }
+
     public bool Enabled { get; set; } = true;
 }
 

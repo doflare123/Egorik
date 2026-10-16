@@ -16,7 +16,6 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 {
     private readonly AssistantEngine _engine;
     private readonly IAssistantSettingsService _settings;
-    private readonly IScenarioRepository _scenarioRepository;
     private readonly IVoiceCommandSource _voiceCommandSource;
     private readonly IVoiceModelService _voiceModelService;
     private readonly INeuralVoiceModelService _neuralVoiceModelService;
@@ -44,10 +43,6 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     private bool _isBusy;
     private CancellationTokenSource? _executionCancellation;
     private int _voiceSuppressionVersion;
-    private string _scenarioName = string.Empty;
-    private string _scenarioTrigger = string.Empty;
-    private string _scenarioCommandsText = string.Empty;
-    private ScenarioItemViewModel? _selectedScenario;
     private string _voiceStatusText;
     private double _voiceDownloadProgress;
     private bool _isVoiceModelInstalled;
@@ -68,7 +63,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     public MainViewModel(
         AssistantEngine engine,
         IAssistantSettingsService settings,
-        IScenarioRepository scenarioRepository,
+        ScenarioEditorViewModel scenarioEditor,
         IVoiceCommandSource voiceCommandSource,
         IAudioInputDeviceService audioInputDevices,
         IVoiceModelService voiceModelService,
@@ -86,7 +81,8 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         _startWithSystem = settings.Current.StartWithSystem;
         _detailedFailureInformation = settings.Current.DetailedFailureInformation;
         _settings = settings;
-        _scenarioRepository = scenarioRepository;
+        ScenarioEditor = scenarioEditor;
+        ScenarioEditor.NavigationRequested += OnScenarioNavigationRequested;
         _voiceCommandSource = voiceCommandSource;
         AudioInputSettings = new AudioInputSettingsViewModel(audioInputDevices, settings.Current.AudioInputDeviceId);
         _voiceModelService = voiceModelService;
@@ -142,8 +138,6 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
         ExecuteCommand = new AsyncRelayCommand(ExecuteAsync, () => !string.IsNullOrWhiteSpace(CommandText));
         SaveSettingsCommand = new AsyncRelayCommand(SaveSettingsAsync);
-        AddScenarioCommand = new AsyncRelayCommand(AddScenarioAsync);
-        DeleteScenarioCommand = new AsyncRelayCommand(DeleteSelectedScenarioAsync, () => SelectedScenario is not null);
         DownloadVoiceModelCommand = new AsyncRelayCommand(
             DownloadVoiceModelAsync,
             () => !IsVoiceModelInstalled);
@@ -172,7 +166,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     public ObservableCollection<HistoryItemViewModel> History { get; } = [];
 
-    public ObservableCollection<ScenarioItemViewModel> Scenarios { get; } = [];
+    public ScenarioEditorViewModel ScenarioEditor { get; }
 
     public ObservableCollection<PluginItemViewModel> Plugins { get; } = [];
 
@@ -181,10 +175,6 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     public AsyncRelayCommand ExecuteCommand { get; }
 
     public AsyncRelayCommand SaveSettingsCommand { get; }
-
-    public AsyncRelayCommand AddScenarioCommand { get; }
-
-    public AsyncRelayCommand DeleteScenarioCommand { get; }
 
     public AsyncRelayCommand DownloadVoiceModelCommand { get; }
 
@@ -416,45 +406,10 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _selectedTabIndex, value);
     }
 
-    public string ScenarioName
-    {
-        get => _scenarioName;
-        set => SetProperty(ref _scenarioName, value);
-    }
-
-    public string ScenarioTrigger
-    {
-        get => _scenarioTrigger;
-        set => SetProperty(ref _scenarioTrigger, value);
-    }
-
-    public string ScenarioCommandsText
-    {
-        get => _scenarioCommandsText;
-        set => SetProperty(ref _scenarioCommandsText, value);
-    }
-
-    public ScenarioItemViewModel? SelectedScenario
-    {
-        get => _selectedScenario;
-        set
-        {
-            if (SetProperty(ref _selectedScenario, value))
-            {
-                DeleteScenarioCommand.RaiseCanExecuteChanged();
-            }
-        }
-    }
-
     public async Task InitializeAsync()
     {
         await AudioInputSettings.RefreshAsync();
-        var scenarios = await _scenarioRepository.GetAllAsync();
-        Scenarios.Clear();
-        foreach (var scenario in scenarios)
-        {
-            Scenarios.Add(new ScenarioItemViewModel(scenario));
-        }
+        await ScenarioEditor.InitializeAsync();
 
         await ApplyPluginActivationsAsync();
 
@@ -470,6 +425,8 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _executionCancellation?.Cancel();
+        ScenarioEditor.Dispose();
+        ScenarioEditor.NavigationRequested -= OnScenarioNavigationRequested;
         _voiceCommandSource.StateChanged -= OnVoiceStateChanged;
         _voiceCommandSource.CommandRecognized -= OnVoiceCommandRecognized;
         _voiceCommandSource.ActivityChanged -= OnVoiceActivityChanged;
@@ -516,18 +473,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             StatusText = result.Message;
             CommandText = string.Empty;
 
-            SelectedTabIndex = result.ClientAction switch
-            {
-                ClientAction.OpenSettings => 2,
-                ClientAction.OpenScenarios => 1,
-                ClientAction.OpenCommandCatalog => 3,
-                _ => SelectedTabIndex
-            };
-
-            if (result.ClientAction != ClientAction.None)
-            {
-                WindowRequested?.Invoke(this, EventArgs.Empty);
-            }
+            ApplyClientAction(result.ClientAction);
 
             if (SpeakResponses && _speechSynthesizer.IsAvailable)
             {
@@ -567,6 +513,23 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         {
             _executionCancellation = null;
             _isBusy = false;
+        }
+    }
+
+    private void OnScenarioNavigationRequested(object? sender, ClientAction action) => ApplyClientAction(action);
+
+    private void ApplyClientAction(ClientAction action)
+    {
+        SelectedTabIndex = action switch
+        {
+            ClientAction.OpenSettings => 2,
+            ClientAction.OpenScenarios => 1,
+            ClientAction.OpenCommandCatalog => 3,
+            _ => SelectedTabIndex
+        };
+        if (action != ClientAction.None)
+        {
+            WindowRequested?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -638,6 +601,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
         RaisePropertyChanged(nameof(CommandCatalog));
         var pluginResult = await ApplyPluginActivationsAsync();
+        ScenarioEditor.RefreshActions();
 
         if (VoiceActivationEnabled)
         {
@@ -924,64 +888,6 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         return $"Модель: {AiModel}. {keyStatus}";
     }
 
-    private async Task AddScenarioAsync()
-    {
-        var name = ScenarioName.Trim();
-        var trigger = ScenarioTrigger.Trim();
-        var commands = ScenarioCommandsText
-            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(command => command.Length > 0)
-            .ToList();
-
-        if (name.Length == 0 || trigger.Length == 0 || commands.Count == 0)
-        {
-            StatusText = "Для сценария нужны название, фраза и хотя бы одно действие.";
-            return;
-        }
-
-        var all = (await _scenarioRepository.GetAllAsync()).ToList();
-        if (all.Any(item =>
-                TextNormalizer.Normalize(item.Trigger) == TextNormalizer.Normalize(trigger)))
-        {
-            StatusText = "Сценарий с такой фразой уже существует.";
-            return;
-        }
-
-        var scenario = new AssistantScenario
-        {
-            Name = name,
-            Trigger = trigger,
-            Commands = commands
-        };
-
-        all.Add(scenario);
-        await _scenarioRepository.SaveAsync(all);
-        Scenarios.Add(new ScenarioItemViewModel(scenario));
-
-        ScenarioName = string.Empty;
-        ScenarioTrigger = string.Empty;
-        ScenarioCommandsText = string.Empty;
-        StatusText = $"Сценарий «{name}» сохранён.";
-    }
-
-    private async Task DeleteSelectedScenarioAsync()
-    {
-        if (SelectedScenario is null)
-        {
-            return;
-        }
-
-        var selected = SelectedScenario;
-        var all = (await _scenarioRepository.GetAllAsync())
-            .Where(item => item.Id != selected.Model.Id)
-            .ToList();
-
-        await _scenarioRepository.SaveAsync(all);
-        Scenarios.Remove(selected);
-        SelectedScenario = null;
-        StatusText = $"Сценарий «{selected.Name}» удалён.";
-    }
-
     private static string FormatAliases(IReadOnlyDictionary<string, string> values)
     {
         var builder = new StringBuilder();
@@ -1036,6 +942,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             if (eventArgs.State == VoiceInputState.Suppressed)
             {
                 _executionCancellation?.Cancel();
+                if (ScenarioEditor.IsRunning) { ScenarioEditor.CancelCommand.Execute(null); }
                 VoiceActivityText = eventArgs.Message;
                 VoiceInputLevel = 0;
             }

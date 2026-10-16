@@ -1,0 +1,98 @@
+<UserControl
+    x:Class="Egorik.App.Views.ScenarioEditorView"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:views="clr-namespace:Egorik.App.Views">
+  <Grid Margin="0,8" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="8">
+    <Grid ColumnDefinitions="180,*,*,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding !IsRunning}">
+      <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Scenarios}" SelectedItem="{Binding SelectedScenario}" PlaceholderText="Мои сценарии">
+        <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" /></DataTemplate></ComboBox.ItemTemplate>
+      </ComboBox>
+      <TextBox Grid.Column="1" PlaceholderText="Название сценария" Text="{Binding Name}" MaxLength="120" />
+      <TextBox Grid.Column="2" PlaceholderText="Фраза запуска" Text="{Binding Trigger}" MaxLength="300" />
+      <Button Grid.Column="3" Content="Новый" Command="{Binding NewCommand}" />
+      <Button Grid.Column="4" Content="Удалить" Command="{Binding DeleteCommand}" />
+    </Grid>
+    <DockPanel Grid.Row="1" LastChildFill="False">
+      <WrapPanel DockPanel.Dock="Left">
+        <Button Margin="0,0,5,0" Content="↶" Command="{Binding UndoCommand}" ToolTip.Tip="Отменить изменение (Ctrl+Z)" />
+        <Button Margin="0,0,5,0" Content="↷" Command="{Binding RedoCommand}" ToolTip.Tip="Повторить (Ctrl+Y)" />
+        <Button Margin="0,0,5,0" Content="Параметры" Command="{Binding EditBlockCommand}" IsEnabled="{Binding !IsRunning}" />
+        <Button Margin="0,0,5,0" Content="−" Click="OnZoomOut" ToolTip.Tip="Уменьшить масштаб" />
+        <Button Margin="0,0,5,0" Content="+" Click="OnZoomIn" ToolTip.Tip="Увеличить масштаб" />
+        <Button Margin="0,0,5,0" Content="Вместить" Click="OnFit" />
+        <Button Margin="0,0,5,0" Content="Развернуть" Click="OnExpand" />
+      </WrapPanel>
+      <WrapPanel DockPanel.Dock="Right">
+        <Button Margin="5,0,0,0" Content="Проверить" Command="{Binding ValidateCommand}" IsEnabled="{Binding !IsRunning}" />
+        <Button Margin="5,0,0,0" Content="Сохранить" Command="{Binding SaveCommand}" IsEnabled="{Binding !IsRunning}" Classes="primary" />
+        <Button Margin="5,0,0,0" Content="▶" ToolTip.Tip="Запустить" Command="{Binding RunCommand}" />
+        <Button Margin="5,0,0,0" Content="■" ToolTip.Tip="Остановить" Command="{Binding CancelCommand}" />
+      </WrapPanel>
+    </DockPanel>
+    <Border Grid.Row="2" BorderBrush="#2B3448" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+      <views:ScenarioGraphControl x:Name="Workspace" Editor="{Binding}" />
+    </Border>
+    <Grid Grid.Row="3" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+      <TextBlock VerticalAlignment="Center" Text="{Binding Status}" TextWrapping="Wrap" FontSize="12" />
+      <CheckBox Grid.Column="1" Content="Запуск по фразе" IsChecked="{Binding Enabled}" IsEnabled="{Binding !IsRunning}" />
+    </Grid>
+    <Grid Grid.RowSpan="4" Background="#C00A0B10" IsVisible="{Binding IsBlockEditorOpen}">
+      <Border Margin="24" Padding="20" MaxWidth="560" Background="#191E2B" BorderBrush="#53617D" BorderThickness="1" CornerRadius="14">
+        <Grid RowDefinitions="Auto,*,Auto" RowSpacing="14">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Classes="h2" Text="Параметры блока" />
+            <Button Grid.Column="1" Content="✕" Command="{Binding CloseBlockEditorCommand}" />
+          </Grid>
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+          <StackPanel DataContext="{Binding SelectedBlock}" Spacing="10">
+            <TextBlock FontWeight="SemiBold" Text="{Binding KindTitle}" />
+            <TextBlock Classes="muted" Text="Название блока" />
+            <TextBox Text="{Binding Title}" MaxLength="120" />
+            <StackPanel IsVisible="{Binding IsAction}" Spacing="8">
+              <TextBlock Classes="muted" Text="Что сделать" />
+              <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableActions}" SelectedItem="{Binding SelectedAction}">
+                <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Title}" TextWrapping="Wrap" /></DataTemplate></ComboBox.ItemTemplate>
+              </ComboBox>
+              <TextBlock Classes="muted" Text="{Binding SelectedAction.Description}" TextWrapping="Wrap" />
+              <ItemsControl ItemsSource="{Binding Arguments}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel Margin="0,0,0,10" Spacing="5">
+                      <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
+                      <ComboBox IsVisible="{Binding IsChoice}" HorizontalAlignment="Stretch" ItemsSource="{Binding Choices}" SelectedItem="{Binding SelectedChoice}">
+                        <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Title}" TextWrapping="Wrap" /></DataTemplate></ComboBox.ItemTemplate>
+                      </ComboBox>
+                      <TextBox IsVisible="{Binding IsText}" Text="{Binding Value}" MaxLength="{Binding MaxLength}" />
+                      <TextBlock Classes="muted" Text="{Binding Hint}" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+            <StackPanel IsVisible="{Binding IsDelay}" Spacing="6">
+              <TextBlock Text="Длительность паузы, секунды" />
+              <NumericUpDown Minimum="1" Maximum="30" Increment="1" FormatString="0" Value="{Binding DelaySeconds}" />
+            </StackPanel>
+            <StackPanel IsVisible="{Binding IsCondition}" Spacing="6">
+              <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Conditions}" SelectedItem="{Binding SelectedCondition}">
+                <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Title}" TextWrapping="Wrap" /></DataTemplate></ComboBox.ItemTemplate>
+              </ComboBox>
+              <AutoCompleteBox IsVisible="{Binding NeedsConditionValue}" ItemsSource="{Binding ConditionSuggestions}" PlaceholderText="Имя приложения или сайта из настроек" Text="{Binding Value}" />
+              <TextBlock Classes="muted" Text="Проверяется наличие в настройках, а не запущенное приложение." TextWrapping="Wrap" />
+            </StackPanel>
+            <StackPanel IsVisible="{Binding IsLegacy}" Spacing="6">
+              <TextBox Text="{Binding Value}" MaxLength="300" PlaceholderText="Например: который час" />
+              <TextBlock Classes="muted" Text="Совместимость со старыми сценариями. Текст проходит обычную маршрутизацию, включая настроенный ИИ. Для новых блоков выбирайте конкретное действие." TextWrapping="Wrap" />
+            </StackPanel>
+          </StackPanel>
+          </ScrollViewer>
+          <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
+            <Button HorizontalAlignment="Left" Content="Удалить блок" Command="{Binding RemoveBlockCommand}" />
+            <Button Grid.Column="1" Classes="primary" Content="Готово" Command="{Binding CloseBlockEditorCommand}" />
+          </Grid>
+        </Grid>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

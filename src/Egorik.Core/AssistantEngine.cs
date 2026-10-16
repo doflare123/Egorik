@@ -10,7 +10,8 @@ public sealed class AssistantEngine(
     IScenarioRepository scenarioRepository,
     IAssistantSettingsService settingsService,
     IAiPlanner aiPlanner,
-    IAiToolExecutor aiToolExecutor)
+    IAiToolExecutor aiToolExecutor,
+    IScenarioFlowExecutor? scenarioFlowExecutor = null)
 {
     private const int MaximumScenarioDepth = 3;
     private const int MaximumScenarioCommands = 20;
@@ -103,6 +104,19 @@ public sealed class AssistantEngine(
         if (scenario is null)
         {
             return null;
+        }
+
+        if (scenario.Flow is not null)
+        {
+            if (scenarioFlowExecutor is null)
+            {
+                return CommandResult.Failure("Исполнитель блок-схем не подключён.", "scenario.execute");
+            }
+
+            return await scenarioFlowExecutor.ExecuteAsync(
+                scenario.Flow,
+                (command, token) => ExecuteInternalAsync(command, depth + 1, token),
+                cancellationToken: cancellationToken);
         }
 
         if (scenario.Commands.Count == 0)

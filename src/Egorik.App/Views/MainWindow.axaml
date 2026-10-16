@@ -2,6 +2,7 @@
     x:Class="Egorik.App.Views.MainWindow"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:views="clr-namespace:Egorik.App.Views"
     Width="1060"
     Height="720"
     MinWidth="880"
@@ -173,64 +174,7 @@
       </TabItem>
 
       <TabItem Header="Сценарии">
-        <Grid Margin="6,22" ColumnDefinitions="0.9*,1.1*" ColumnSpacing="18">
-          <Border Classes="card">
-            <StackPanel Spacing="14">
-              <TextBlock Classes="h2" Text="Мои сценарии" />
-              <TextBlock
-                  Classes="muted"
-                  Text="Одна фраза запускает последовательность безопасных команд."
-                  TextWrapping="Wrap" />
-
-              <ListBox
-                  MinHeight="300"
-                  ItemsSource="{Binding Scenarios}"
-                  SelectedItem="{Binding SelectedScenario}">
-                <ListBox.ItemTemplate>
-                  <DataTemplate>
-                    <Border Margin="0,3" Padding="12" Background="#181B25" CornerRadius="10">
-                      <Grid ColumnDefinitions="*,Auto">
-                        <StackPanel Spacing="3">
-                          <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
-                          <TextBlock Classes="muted" FontSize="12" Text="{Binding Trigger}" />
-                        </StackPanel>
-                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Classes="muted" Text="{Binding Summary}" />
-                      </Grid>
-                    </Border>
-                  </DataTemplate>
-                </ListBox.ItemTemplate>
-              </ListBox>
-
-              <Button
-                  HorizontalAlignment="Left"
-                  Classes="secondary"
-                  Command="{Binding DeleteScenarioCommand}"
-                  Content="Удалить выбранный" />
-            </StackPanel>
-          </Border>
-
-          <Border Grid.Column="1" Classes="card">
-            <StackPanel Spacing="12">
-              <TextBlock Classes="h2" Text="Новый сценарий" />
-              <TextBlock Classes="muted" Text="Название" />
-              <TextBox Text="{Binding ScenarioName}" PlaceholderText="Начало рабочего дня" />
-              <TextBlock Classes="muted" Text="Фраза запуска" />
-              <TextBox Text="{Binding ScenarioTrigger}" PlaceholderText="начинаем работать" />
-              <TextBlock Classes="muted" Text="Действия — по одному на строку" />
-              <TextBox
-                  Height="150"
-                  AcceptsReturn="True"
-                  Text="{Binding ScenarioCommandsText}"
-                  TextWrapping="Wrap"
-                  PlaceholderText="открой почта&#10;открой github&#10;открой терминал" />
-              <Button
-                  HorizontalAlignment="Left"
-                  Classes="primary"
-                  Command="{Binding AddScenarioCommand}"
-                  Content="Сохранить сценарий" />
-            </StackPanel>
-          </Border>
-        </Grid>
+        <views:ScenarioEditorView DataContext="{Binding ScenarioEditor}" />
       </TabItem>
 
       <TabItem Header="Настройки">
