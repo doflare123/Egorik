@@ -10,6 +10,24 @@ namespace Egorik.Core.Tests;
 public sealed class AssistantUsabilityTests
 {
     [TestMethod]
+    [DataRow(true, false, "application.action", "Задача выполнена.")]
+    [DataRow(true, true, "scenario.execute", "Задача выполнена.")]
+    [DataRow(false, false, "application.action", "Задача не выполнена.")]
+    [DataRow(false, true, "ai.plan", "Задача не выполнена.")]
+    [DataRow(false, true, "scenario.execute", "Задача не выполнена.")]
+    public void ShortResponsesUseOnlyOutcomeAndPreserveDetails(
+        bool success, bool detailedFailures, string commandId, string expected)
+    {
+        var result = success
+            ? CommandResult.Success("Подробности результата", commandId)
+            : CommandResult.Failure("Подробности результата", commandId);
+
+        Assert.AreEqual(expected, SpokenResponse.For(result, detailedFailures, shortResponses: true));
+        Assert.AreEqual("Подробности результата", result.Message);
+        Assert.AreEqual(success, result.IsSuccess);
+    }
+
+    [TestMethod]
     public void BriefFailuresKeepDetailsInResultAndSuccessSpeechIntact()
     {
         var failure = CommandResult.Failure("HTTP 503: подробности", "ai.plan");

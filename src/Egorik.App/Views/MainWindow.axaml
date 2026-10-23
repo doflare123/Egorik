@@ -245,9 +245,14 @@
                   <CheckBox
                       Content="Озвучивать ответы"
                       IsChecked="{Binding SpeakResponses}" />
+                  <CheckBox Content="Короткий ответ"
+                            IsChecked="{Binding ShortResponses}" />
+                  <TextBlock Classes="muted" Text="Произносить только «Задача выполнена» или «Задача не выполнена». Подробности остаются в истории."
+                             TextWrapping="Wrap" />
                   <CheckBox Content="Подробная информация о неудаче"
+                            IsEnabled="{Binding !ShortResponses}"
                             IsChecked="{Binding DetailedFailureInformation}" />
-                  <TextBlock Classes="muted" Text="Зачитывать подробности ошибок. Краткий ответ используется по умолчанию."
+                  <TextBlock Classes="muted" Text="Зачитывать подробности ошибок, когда выключен короткий ответ."
                              TextWrapping="Wrap" />
                   <CheckBox Content="Запускать вместе с Windows в tray"
                             IsEnabled="{Binding IsSystemStartupSupported}"

@@ -18,7 +18,10 @@ public sealed class DesktopApplicationLauncher(IInstalledApplicationLocator appl
             Process.Start(new ProcessStartInfo
             {
                 FileName = resolvedTarget,
-                UseShellExecute = true
+                UseShellExecute = true,
+                WorkingDirectory = Path.IsPathFullyQualified(resolvedTarget)
+                    ? Path.GetDirectoryName(resolvedTarget) ?? string.Empty
+                    : string.Empty
             });
 
             return ValueTask.FromResult(new LaunchResult(true, "Приложение запущено."));

@@ -36,6 +36,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     private string _siteAliasesText;
     private string _documentAliasesText;
     private bool _speakResponses;
+    private bool _shortResponses;
     private bool _detailedFailureInformation;
     private bool _startWithSystem;
     private readonly ISystemStartupService _systemStartup;
@@ -108,6 +109,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             DisplayVoiceActivity);
         _searchProvider = settings.Current.SearchProvider;
         _speakResponses = settings.Current.SpeakResponses;
+        _shortResponses = settings.Current.ShortResponses;
         _voiceActivationEnabled = settings.Current.VoiceActivationEnabled;
         _aiEnabled = settings.Current.AiEnabled;
         _aiEndpoint = settings.Current.AiEndpoint;
@@ -320,6 +322,12 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     {
         get => _speakResponses;
         set => SetProperty(ref _speakResponses, value);
+    }
+
+    public bool ShortResponses
+    {
+        get => _shortResponses;
+        set => SetProperty(ref _shortResponses, value);
     }
 
     public bool DetailedFailureInformation
@@ -539,7 +547,8 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
                         await _voiceCommandSource.PauseAsync();
                     }
 
-                    await _speechSynthesizer.SpeakAsync(SpokenResponse.For(result, DetailedFailureInformation), cancellation.Token);
+                    await _speechSynthesizer.SpeakAsync(
+                        SpokenResponse.For(result, DetailedFailureInformation, ShortResponses), cancellation.Token);
                 }
                 finally
                 {
@@ -608,6 +617,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         _settings.Current.AssistantName = name;
         _settings.Current.SearchProvider = SearchProvider;
         _settings.Current.SpeakResponses = SpeakResponses;
+        _settings.Current.ShortResponses = ShortResponses;
         _settings.Current.VoiceActivationEnabled = VoiceActivationEnabled;
         _settings.Current.AudioInputDeviceId = AudioInputSettings.SelectedDeviceId;
         _settings.Current.AiEnabled = AiEnabled;

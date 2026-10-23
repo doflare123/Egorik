@@ -8,6 +8,8 @@ public sealed class AssistantSettings
 
     public bool SpeakResponses { get; set; } = true;
 
+    public bool ShortResponses { get; set; }
+
     public bool DetailedFailureInformation { get; set; }
 
     public bool StartWithSystem { get; set; }

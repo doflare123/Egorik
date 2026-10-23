@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Runtime.Versioning;
 using Egorik.Core.Platform;
 using Windows.Media.Control;
@@ -7,7 +6,9 @@ namespace Egorik.Infrastructure.Platform;
 
 public sealed class DesktopYandexMusicController(
     IInstalledApplicationLocator applicationLocator,
-    IYandexMusicVolumeService volumeService) : IYandexMusicController
+    IYandexMusicVolumeService volumeService,
+    IYandexMusicWindowService windowService,
+    IApplicationLauncher applicationLauncher) : IYandexMusicController
 {
     public const string ExecutableName = "Яндекс Музыка.exe";
 
@@ -94,53 +95,35 @@ public sealed class DesktopYandexMusicController(
         }
     }
 
-    private ValueTask<LaunchResult> LaunchAsync(
+    private async ValueTask<LaunchResult> LaunchAsync(
         string? deepLink,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!OperatingSystem.IsWindows())
         {
-            return ValueTask.FromResult(new LaunchResult(
+            return new LaunchResult(
                 false,
-                "Приложение Яндекс Музыка пока поддерживается только в Windows."));
+                "Приложение Яндекс Музыка пока поддерживается только в Windows.");
+        }
+
+        if (deepLink is null && await windowService.TryShowAsync(cancellationToken) is { } shown)
+        {
+            return shown;
         }
 
         var executable = applicationLocator.FindExecutable(ExecutableName);
         if (executable is null)
         {
-            return ValueTask.FromResult(new LaunchResult(
+            return new LaunchResult(
                 false,
                 $"Не найден файл «{ExecutableName}». Ожидаемый каталог: " +
-                @"%LocalAppData%\Programs\YandexMusic."));
+                @"%LocalAppData%\Programs\YandexMusic.");
         }
 
-        try
-        {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = executable,
-                UseShellExecute = false
-            };
-            if (deepLink is not null)
-            {
-                startInfo.ArgumentList.Add(deepLink);
-            }
-
-            Process.Start(startInfo);
-            return ValueTask.FromResult(new LaunchResult(
-                true,
-                deepLink is null
-                    ? "Приложение Яндекс Музыка открыто."
-                    : "Команда передана приложению Яндекс Музыка."));
-        }
-        catch (Exception exception) when (
-            exception is InvalidOperationException or System.ComponentModel.Win32Exception)
-        {
-            return ValueTask.FromResult(new LaunchResult(
-                false,
-                $"Не удалось запустить Яндекс Музыку: {exception.Message}"));
-        }
+        // Let Windows dispatch deeplinks through the registered protocol handler.
+        // Do not start another executable with a deeplink as a raw argument.
+        return await applicationLauncher.LaunchAsync(deepLink ?? executable, cancellationToken);
     }
 
     [SupportedOSPlatform("windows10.0.17763")]

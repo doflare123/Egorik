@@ -42,6 +42,7 @@ internal static class Bootstrapper
         services.AddSingleton<IMediaControlService, DesktopMediaControlService>();
         services.AddSingleton<IYandexMusicController, DesktopYandexMusicController>();
         services.AddSingleton<IYandexMusicVolumeService, DesktopYandexMusicVolumeService>();
+        services.AddSingleton<IYandexMusicWindowService, DesktopYandexMusicWindowService>();
         services.AddSingleton<IOfficeDocumentService, OpenXmlOfficeDocumentService>();
         services.AddSingleton<DesktopDotaHeroPicker>();
         services.AddSingleton<IDotaHeroPicker>(services =>

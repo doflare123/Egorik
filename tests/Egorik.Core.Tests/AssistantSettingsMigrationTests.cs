@@ -32,8 +32,10 @@ public sealed class AssistantSettingsMigrationTests
             Assert.AreEqual("Калининград", service.Current.DefaultWeatherCity);
             Assert.AreEqual(string.Empty, service.Current.AudioInputDeviceId);
             Assert.IsFalse(service.Current.DetailedFailureInformation);
+            Assert.IsFalse(service.Current.ShortResponses);
             Assert.IsFalse(service.Current.StartWithSystem);
             service.Current.DetailedFailureInformation = true;
+            service.Current.ShortResponses = true;
             service.Current.StartWithSystem = true;
             service.Current.AudioInputDeviceId = "{0.0.1.00000000}.{fixed-device-id}";
             service.Current.DefaultWeatherCity = "Москва";
@@ -41,6 +43,7 @@ public sealed class AssistantSettingsMigrationTests
             await service.LoadAsync();
             Assert.AreEqual("Москва", service.Current.DefaultWeatherCity);
             Assert.IsTrue(service.Current.DetailedFailureInformation);
+            Assert.IsTrue(service.Current.ShortResponses);
             Assert.IsTrue(service.Current.StartWithSystem);
             Assert.AreEqual("{0.0.1.00000000}.{fixed-device-id}", service.Current.AudioInputDeviceId);
             Assert.AreEqual("demo.exe", service.Current.Applications["моё приложение"]);
